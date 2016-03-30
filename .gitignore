@@ -1,0 +1,5 @@
+gan/data
+gan/models
+char-rnn-tensorflow/data
+char-rnn-tensorflow/save
+*.pyc
