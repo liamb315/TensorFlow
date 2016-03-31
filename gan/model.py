@@ -22,12 +22,11 @@ class Generator(object):
         else:
             raise Exception("model type not supported: {}".format(args.model))
 
-        with tf.device('/gpu:1'):
-            self.cell = rnn_cell.MultiRNNCell([cell] * args.num_layers)
+        self.cell = rnn_cell.MultiRNNCell([cell] * args.num_layers)
 
-            self.input_data     = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
-            self.targets        = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
-            self.initial_state = self.cell.zero_state(args.batch_size, tf.float32)
+        self.input_data     = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
+        self.targets        = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
+        self.initial_state = self.cell.zero_state(args.batch_size, tf.float32)
 
         with tf.variable_scope('rnn'):
             softmax_w = tf.get_variable('softmax_w', [args.rnn_size, args.vocab_size])
@@ -67,11 +66,6 @@ class Generator(object):
             x[0,0]  = vocab[char]
             feed    = {self.input_data: x, self.intitial_state: state}
             [state] = sess.run([self.final_state], feed)
-
-        # def weighted_sample(weights):
-        #     t = np.cumsum(weights)
-        #     s = np.sum(weights)
-        #     return (int(np.searchsorted(t, np.random.rand(1) * s)))
 
         sequence = initial
         char = initial[-1]

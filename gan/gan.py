@@ -10,7 +10,7 @@ import os
 import cPickle
 
 logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
+# logger.setLevel(logging.DEBUG)
 
 
 def parse_args():
@@ -19,7 +19,7 @@ def parse_args():
 		help='data directory containing reviews')
 	parser.add_argument('--save_dir', type=str, default='models',
 		help='directory to store checkpointed models')
-	parser.add_argument('--rnn_size', type=int, default=256,
+	parser.add_argument('--rnn_size', type=int, default=512,
 		help='size of RNN hidden state')
 	parser.add_argument('--num_layers', type=int, default=2,
 		help='number of layers in the RNN')
@@ -29,7 +29,11 @@ def parse_args():
 		help='minibatch size')
 	parser.add_argument('--seq_length', type=int, default=200,
 		help='RNN sequence length')
-	parser.add_argument('--num_epochs', type=int, default=50,
+	parser.add_argument('-n', type=int, default=500,
+                       help='number of characters to sample')
+	parser.add_argument('--prime', type=str, default=' ',
+                       help='prime text')
+	parser.add_argument('--num_epochs', type=int, default=5,
 		help='number of epochs')
 	parser.add_argument('--save_every', type=int, default=50,
 		help='save frequency')
@@ -77,10 +81,12 @@ def train_generator(args):
 				feed  = {generator.input_data: x, generator.targets: y, generator.initial_state: state}
 				train_loss, state, _ = sess.run([generator.cost, generator.final_state, generator.train_op], feed)
 				end   = time.time()
+				
 				print '{}/{} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}' \
 					.format(epoch * batcher.num_batches + batch,
 						args.num_epochs * batcher.num_batches,
 						epoch, train_loss, end - start)
+				
 				if (epoch * batcher.num_batches + batch) % args.save_every == 0:
 					checkpoint_path = os.path.join(args.save_dir, 'model.ckpt')
 					saver.save(sess, checkpoint_path, global_step = epoch * batcher.num_batches + batch)
@@ -115,7 +121,7 @@ def train_generator_interactive(args, sess, generator, batcher, num_epochs, num_
 				print 'Model saved to {}'.format(checkpoint_path)
 
 
-def sample_interactive(args, sess, generator, num_char = 500, prime = ' '):
+def sample_interactive(args, sess, num_char = 500, prime = ' '):
 	with open(os.path.join(args.save_dir, 'config.pkl')) as f:
 		saved_args = cPickle.load(f)
 	with open(os.path.join(args.save_dir, 'real_beer_vocab.pkl')) as f:
@@ -128,14 +134,34 @@ def sample_interactive(args, sess, generator, num_char = 500, prime = ' '):
 		print model.sample(sess, chars, vocab, num_char, prime)
 
 
+def generate_sample(args):
+    with open(os.path.join(args.save_dir, 'config.pkl')) as f:
+        saved_args = cPickle.load(f)
+    with open(os.path.join(args.save_dir, 'real_beer_vocab.pkl')) as f:
+        chars, vocab = cPickle.load(f)
+    model = Generator(saved_args, False)
+    with tf.Session() as sess:
+        tf.initialize_all_variables().run()
+        saver = tf.train.Saver(tf.all_variables())
+        ckpt = tf.train.get_checkpoint_state(args.save_dir)
+        if ckpt and ckpt.model_checkpoint_path:
+            saver.restore(sess, ckpt.model_checkpoint_path)
+            print model.sample(sess, chars, vocab, args.n, args.prime)
+
+
 if __name__=='__main__':	
 	args = parse_args()
 	# Standard TensorFlow Session
 	# train_generator(args)
+	
+
+
+	generate_sample(args)
+
 
 	#################################
 	# Interactive TensorFlow Session
-	#################################
+	# #################################
 	# sess = tf.InteractiveSession(config=tf.ConfigProto(log_device_placement=True))
 	# # tf.initialize_all_variables().run()
 
@@ -151,8 +177,9 @@ if __name__=='__main__':
 	# logging.debug('Generator...')
 	# generator = Generator(args)
 
-
 	# train_generator_interactive(args, sess, generator, batcher, 1, 100)
+
+
 
 
 	# #sess.close()
