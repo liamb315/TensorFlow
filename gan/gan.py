@@ -30,9 +30,9 @@ def parse_args():
 	parser.add_argument('--seq_length', type=int, default=200,
 		help='RNN sequence length')
 	parser.add_argument('-n', type=int, default=500,
-					   help='number of characters to sample')
+		help='number of characters to sample')
 	parser.add_argument('--prime', type=str, default=' ',
-					   help='prime text')
+		help='prime text')
 	parser.add_argument('--num_epochs', type=int, default=5,
 		help='number of epochs')
 	parser.add_argument('--save_every', type=int, default=50,
@@ -71,8 +71,8 @@ def train_generator(args, load_recent=True):
 		if load_recent:
 			ckpt = tf.train.get_checkpoint_state(args.save_dir)
 			if ckpt and ckpt.model_checkpoint_path:
-				print 'Checkpoint: ', ckpt.model_checkpoint_path
-				saver.restore(sess, ckpt.model_checkpoint_path)
+				saver.restore(sess, 'models/model.ckpt-2200')
+				# saver.restore(sess, ckpt.model_checkpoint_path)
 
 		for epoch in xrange(args.num_epochs):
 			# Anneal learning rate
