@@ -82,29 +82,3 @@ class Generator(object):
         return sequence
 
 
-class Discriminator(object):
-    def __init__(self, args, is_training=True):
-        self.args = args
-
-        if not is_training:
-            args.batch_size = 1
-            args.seq_length = 1
-
-        if args.model == 'rnn':
-            self.cell = rnn_cell.BasicRNNCell(args.rnn_size)
-        if args.model == 'gru':
-            self.cell = rnn_cell.GRUCell(args.rnn_size)
-        if args.model == 'lstm':
-            self.cell = rnn_cell.BasicLSTMCell(args.rnn_size)
-        else:
-            raise Exception('model type not supported: {}'.format(args.model))
-
-        self.cell = rnn_cell.MultiRNNCell([cell] * args.num_layers)
-
-        self.input         = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
-        self.targets       = tf.placeholder(tf.int32, [args.batch_size, 1])
-        self.initial_state = tf.placeholder(args.batch_size, tf.float32)
-
-        with tf.variable_scope('rnn_d'):
-            softmax_w = tf.get_variable('softmax_w', [args.rnn_size, args.vocab_size])
-            softmax_b = tf.get_variable('softmax_b' [args.vocab_size])

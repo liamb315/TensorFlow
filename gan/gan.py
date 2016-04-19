@@ -4,7 +4,7 @@ import logging
 from tensorflow.models.rnn import *
 from argparse import ArgumentParser
 from batcher import Batcher
-from model import Generator
+from generator import Generator
 import time
 import os
 import cPickle
@@ -71,8 +71,7 @@ def train_generator(args, load_recent=True):
 		if load_recent:
 			ckpt = tf.train.get_checkpoint_state(args.save_dir)
 			if ckpt and ckpt.model_checkpoint_path:
-				saver.restore(sess, 'models/model.ckpt-2200')
-				# saver.restore(sess, ckpt.model_checkpoint_path)
+				saver.restore(sess, ckpt.model_checkpoint_path)
 
 		for epoch in xrange(args.num_epochs):
 			# Anneal learning rate
@@ -117,8 +116,8 @@ def generate_sample(args):
 
 if __name__=='__main__':	
 	args = parse_args()
-
-	train_generator(args, load_recent=True)
+	with tf.device('/gpu:3'):
+		train_generator(args, load_recent=True)
 	
 	# generate_sample(args)
 

@@ -39,8 +39,8 @@ def sample(args, num_samples = 10):
             
 if __name__ == '__main__':
     args = parse_args()
-
-    sample(args)    
+    with tf.device('/gpu:3'):
+        sample(args)    
 
     
 
