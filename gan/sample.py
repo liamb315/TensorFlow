@@ -7,7 +7,7 @@ import os
 import cPickle
 
 from batcher import Batcher
-from model import Generator
+from generator import Generator
 
 def parse_args():
     parser = ArgumentParser()

@@ -5,6 +5,7 @@ from tensorflow.models.rnn import *
 from argparse import ArgumentParser
 from batcher import Batcher
 from generator import Generator
+from discriminator import Discriminator
 import time
 import os
 import cPickle
@@ -114,10 +115,28 @@ def generate_sample(args):
 			print model.sample(sess, chars, vocab, args.n, args.prime)
 
 
+def train_discriminator(args, load_recent=True):
+	'''Train the discriminator via classical approach'''
+	logging.debug('Batcher...')
+	batcher   = Batcher(args.data_dir, args.batch_size, args.seq_length)
+
+	logging.debug('Vocabulary...')
+	with open(os.path.join(args.save_dir, 'config.pkl'), 'w') as f:
+		cPickle.dump(args, f)
+	with open(os.path.join(args.save_dir, 'real_beer_vocab.pkl'), 'w') as f:
+		cPickle.dump((batcher.chars, batcher.vocab), f)
+
+	logging.debug('Creating generator...')
+	discriminator = Discriminator(args, is_training = True)
+
 if __name__=='__main__':	
 	args = parse_args()
 	with tf.device('/gpu:3'):
-		train_generator(args, load_recent=True)
+		train_discriminator(args, load_recent=True)
+
+
+	# with tf.device('/gpu:3'):
+	# 	train_generator(args, load_recent=True)
 	
 	# generate_sample(args)
 
