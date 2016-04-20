@@ -66,3 +66,48 @@ class Batcher(object):
 
 	def reset_batch_pointer(self):
 		self.pointer = 0
+
+
+class DiscriminatorBatcher(object):
+	def __init__(self, data_dir, batch_size, seq_length):
+		self.batch_size = batch_size
+		self.seq_length = seq_length
+
+		real_file    = os.path.join(data_dir, 'real_beer_reviews.txt')
+		fake_file    = os.path.join(data_dir, 'fake_beer_reviews.txt')
+		real_tensors = os.path.join(data_dir, 'real_beer_data_v0.1.npy')
+		fake_tensors = os.path.join(data_dir, 'fake_beer_data_v0.1.npy')
+		vocab_file   = os.path.join(data_dir, 'combined_vocab.pkl')
+
+		if not (os.path.exists(vocab_file) and os.path.exists(real_tensors)) and os.path.exists(fake_tensors):
+			self.preprocess(real_file, fake_file, vocab_file, real_tensors, fake_tensors)
+		else:
+			self.load_preprocessed()
+
+
+		self.create_batches()
+		self.reset_batch_pointer()
+
+
+	def preprocess(self, real_file, fake_file, vocab_file, real_tensors, fake_tensors):
+		logging.debug('Reading files...')
+		with open(real_file, 'r') as f:
+			real = f.read()
+		with open(fake_file, 'r') as f:
+			fake = f.read()
+		data = real + fake
+
+
+	def load_preprocessed(self, vocab_file, real_tensors, fake_tensors):
+		pass
+
+	def create_batches(self):
+		pass
+
+	def next_batch(self):
+		x, y = self.x_batches[self.pointer], self.y_batches[self.pointer]
+		self.pointer += 1 
+		return x, y
+
+	def reset_batch_pointer(self):
+		self.pointer = 0
