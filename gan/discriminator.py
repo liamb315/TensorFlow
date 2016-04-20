@@ -37,7 +37,6 @@ class Discriminator(object):
                 inputs    = tf.split(1, args.seq_length, tf.nn.embedding_lookup(embedding, self.input_data))
                 inputs    = [tf.squeeze(i, [1]) for i in inputs]
 
-        with tf.variable_scope('rnn_d_forward'):
             state   = self.initial_state
             outputs = []
             prev    = None

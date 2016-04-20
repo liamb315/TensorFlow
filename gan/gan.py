@@ -36,6 +36,8 @@ def parse_args():
 		help='prime text')
 	parser.add_argument('--num_epochs', type=int, default=5,
 		help='number of epochs')
+	parser.add_argument('--num_epochs_dis', type=int, default=5,
+		help='number of epochs to train discriminator')
 	parser.add_argument('--save_every', type=int, default=50,
 		help='save frequency')
 	parser.add_argument('--grad_clip', type=float, default=5.,
@@ -76,8 +78,8 @@ def train_generator(args, load_recent=True):
 
 		for epoch in xrange(args.num_epochs):
 			# Anneal learning rate
-			new_lr_rate = args.learning_rate * (args.decay_rate ** epoch)
-			sess.run(tf.assign(generator.lr, new_lr_rate))
+			new_lr = args.learning_rate * (args.decay_rate ** epoch)
+			sess.run(tf.assign(generator.lr, new_lr))
 			batcher.reset_batch_pointer()
 			state = generator.initial_state.eval()
 
@@ -128,6 +130,48 @@ def train_discriminator(args, load_recent=True):
 
 	logging.debug('Creating generator...')
 	discriminator = Discriminator(args, is_training = True)
+
+	with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as sess:
+		tf.initializer_all_variables().run()
+		saver = tf.train.Saver(tf.all_variables())
+
+		if load_recent:
+			ckpt = tf.train.get_checkpoint_state(args.save_dir)
+			if ckpt and ckpt.model_checkpoint_path:
+				saver.restore(sess, ckpt.model_checkpoint_path)
+
+		for epoch in xrange(args.num_epochs_dis):
+			# Anneal learning rate
+			new_lr = args.learning_rate_dis * (args.decay_rate ** epoch)
+			sess.run(tf.assign(discriminator.lr, new_lr))
+
+			# dis_batcher = # TODO
+
+			state = discriminator.initial_state.eval()
+
+			for batch in xrange(batcher.num_batches):
+				start = time.time()
+
+				x, y  = batcher.next_batch()
+				feed  = {discriminator.input_data: x, 
+						discriminator.targets,
+						discriminator.initial_state: state}
+				train_loss, state, _ = sess.run([discriminator.cost,
+												discriminator.final_state,
+												discriminator.train_op], 
+												feed)
+				end   = time.time()
+				
+				print '{}/{} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}' \
+					.format(epoch * batcher.num_batches + batch,
+						args.num_epochs * batcher.num_batches,
+						epoch, train_loss, end - start)
+				
+				if (epoch * batcher.num_batches + batch) % args.save_every == 0:
+					checkpoint_path = os.path.join(args.save_dir, 'model.ckpt')
+					saver.save(sess, checkpoint_path, global_step = epoch * batcher.num_batches + batch)
+					print 'Model saved to {}'.format(checkpoint_path)
+
 
 if __name__=='__main__':	
 	args = parse_args()
