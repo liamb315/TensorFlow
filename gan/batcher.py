@@ -75,35 +75,81 @@ class DiscriminatorBatcher(object):
 
 		real_file    = os.path.join(data_dir, 'real_beer_reviews.txt')
 		fake_file    = os.path.join(data_dir, 'fake_beer_reviews.txt')
-		real_tensors = os.path.join(data_dir, 'real_beer_data_v0.1.npy')
-		fake_tensors = os.path.join(data_dir, 'fake_beer_data_v0.1.npy')
+		real_tensor  = os.path.join(data_dir, 'real_beer_data_v0.1.npy')
+		fake_tensor  = os.path.join(data_dir, 'fake_beer_data_v0.1.npy')
 		vocab_file   = os.path.join(data_dir, 'combined_vocab.pkl')
 
-		if not (os.path.exists(vocab_file) and os.path.exists(real_tensors)) and os.path.exists(fake_tensors):
-			self.preprocess(real_file, fake_file, vocab_file, real_tensors, fake_tensors)
+		if not (os.path.exists(vocab_file) and os.path.exists(real_tensor) and os.path.exists(fake_tensor)):
+			self.preprocess(real_file, fake_file, vocab_file, real_tensor, fake_tensor)
 		else:
-			self.load_preprocessed()
-
+			self.load_preprocessed(vocab_file, real_tensor, fake_tensor)
 
 		self.create_batches()
 		self.reset_batch_pointer()
 
-
-	def preprocess(self, real_file, fake_file, vocab_file, real_tensors, fake_tensors):
+	def preprocess(self, real_file, fake_file, vocab_file, tensor_file_real, tensor_file_fake):
 		logging.debug('Reading files...')
 		with open(real_file, 'r') as f:
-			real = f.read()
+			data_real = f.read()
 		with open(fake_file, 'r') as f:
-			fake = f.read()
-		data = real + fake
+			data_fake = f.read()		
+		data = data_real + data_fake
+		counter = collections.Counter(data)
+		count_pairs = sorted(counter.items(), key=lambda x: -x[1])
+		self.chars, _ = list(zip(*count_pairs))
+		self.vocab_size = len(self.chars)
+		self.vocab      = dict(zip(self.chars, range(len(self.chars))))
+		with open(vocab_file, 'w') as f:
+			cPickle.dump(self.chars, f)
 
+		def build_tensor(tensor_file, data):
+			self.tensor     = np.array(map(self.vocab.get, data))
+			np.save(tensor_file, self.tensor)
 
-	def load_preprocessed(self, vocab_file, real_tensors, fake_tensors):
-		pass
+		self.tensor_real = build_tensor(tensor_file_real, data_real)
+		self.tensor_fake = build_tensor(tensor_file_fake, data_fake)
+		np.save(tensor_file_real, self.tensor_real)
+		np.save(tensor_file_fake, self.tensor_fake)
+
+	def load_preprocessed(self, vocab_file, tensor_file_real, tensor_file_fake):
+		logging.debug('Loading preprocessed files...')
+		with open(vocab_file, 'r') as f:
+			self.chars = cPickle.load(f)
+		self.vocab_size  = len(self.chars)
+		self.vocab       = dict(zip(self.chars, range(len(self.chars))))
+		self.tensor_real = np.load(tensor_file_real)
+		self.tensor_fake = np.load(tensor_file_fake)	
 
 	def create_batches(self):
-		pass
+		logging.debug('Creating batches...')
+		
+		# Real batches
+		num_batches      = self.tensor_real.size / (self.batch_size / 2 * self.seq_length) 
+		self.tensor_real = self.tensor_real[:num_batches * self.batch_size / 2 * self.seq_length]
+		x_data_real      = self.tensor_real
+		y_data_real      = np.ones((len(x_data_real), 1))
 
+		x_batches_real   = np.split(x_data_real.reshape(self.batch_size / 2, -1), num_batches, 1)	
+		y_batches_real   = np.split(y_data_real.reshape(self.batch_size / 2, -1), num_batches, 1)		
+		batches_real     = [np.hstack([x, y]) for x, y in zip(x_batches_real, y_batches_real)]
+
+		# Fake batches
+		num_batches      = self.tensor_fake.size / (self.batch_size / 2 * self.seq_length)
+		self.tensor_fake = self.tensor_fake[:num_batches * self.batch_size / 2 * self.seq_length]
+		x_data_fake      = self.tensor_fake
+		y_data_fake      = np.zeros((len(x_data_fake), 1))
+		
+		x_batches_fake   = np.split(x_data_fake.reshape(self.batch_size / 2, -1), num_batches, 1)	
+		y_batches_fake   = np.split(y_data_fake.reshape(self.batch_size / 2, -1), num_batches, 1)		
+		batches_fake     = [np.hstack([x, y]) for x, y in zip(x_batches_fake, y_batches_fake)]
+
+		# Combine batches 
+		batches          = [np.vstack((real, fake)) for real, fake in zip(batches_real, batches_fake)]
+		batches          = [np.random.shuffle(arr) for arr in batches]
+		self.x_batches   = [arr[:, :-1] for arr in batches]
+		self.y_batches   = [arr[:, -1] for arr in batches]
+		self.num_batches = len(batches)
+	
 	def next_batch(self):
 		x, y = self.x_batches[self.pointer], self.y_batches[self.pointer]
 		self.pointer += 1 
@@ -111,3 +157,4 @@ class DiscriminatorBatcher(object):
 
 	def reset_batch_pointer(self):
 		self.pointer = 0
+

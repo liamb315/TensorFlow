@@ -3,7 +3,7 @@ import numpy as np
 import logging
 from tensorflow.models.rnn import *
 from argparse import ArgumentParser
-from batcher import Batcher
+from batcher import Batcher, DiscriminatorBatcher
 from generator import Generator
 from discriminator import Discriminator
 import time
@@ -120,7 +120,7 @@ def generate_sample(args):
 def train_discriminator(args, load_recent=True):
 	'''Train the discriminator via classical approach'''
 	logging.debug('Batcher...')
-	batcher   = Batcher(args.data_dir, args.batch_size, args.seq_length)
+	batcher  = DiscriminatorBatcher(args.data_dir, args.batch_size, args.seq_length)
 
 	logging.debug('Vocabulary...')
 	with open(os.path.join(args.save_dir, 'config.pkl'), 'w') as f:
@@ -144,18 +144,15 @@ def train_discriminator(args, load_recent=True):
 			# Anneal learning rate
 			new_lr = args.learning_rate_dis * (args.decay_rate ** epoch)
 			sess.run(tf.assign(discriminator.lr, new_lr))
-
-			# dis_batcher = # TODO
-
+			batcher.reset_batch_pointer()
 			state = discriminator.initial_state.eval()
 
 			for batch in xrange(batcher.num_batches):
 				start = time.time()
-
 				x, y  = batcher.next_batch()
 				feed  = {discriminator.input_data: x, 
-						discriminator.targets,
-						discriminator.initial_state: state}
+						 discriminator.targets: y, 
+						 discriminator.initial_state: state}
 				train_loss, state, _ = sess.run([discriminator.cost,
 												discriminator.final_state,
 												discriminator.train_op], 
