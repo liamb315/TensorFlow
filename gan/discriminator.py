@@ -28,7 +28,7 @@ class Discriminator(object):
         self.targets       = tf.placeholder(tf.int32, [args.batch_size, args.seq_length]) # Target replication
         self.initial_state = self.cell.zero_state(args.batch_size, tf.float32)
 
-        with tf.variable_scope('rnn_d'):
+        with tf.variable_scope('rnn'):
             softmax_w = tf.get_variable('softmax_w', [args.rnn_size, 1])
             softmax_b = tf.get_variable('softmax_b', [1])
 
@@ -51,12 +51,12 @@ class Discriminator(object):
         output_tf = tf.reshape(tf.concat(1, outputs), [-1, args.rnn_size])
         self.logits = tf.nn.xw_plus_b(output_tf, softmax_w, softmax_b)
         self.probs  = tf.nn.softmax(self.logits)
-        
+
         # Compute loss
         loss = seq2seq.sequence_loss_by_example([self.logits],
             [tf.reshape(self.targets, [-1])],
-            [tf.ones([args.batch_size * args.seq_length])])
-
+            [tf.ones([args.batch_size * args.seq_length])],
+            1)
         self.cost = tf.reduce_sum(loss) / args.batch_size / args.seq_length
 
         self.final_state = last_state

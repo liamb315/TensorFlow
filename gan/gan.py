@@ -20,7 +20,7 @@ def parse_args():
 		help='data directory containing reviews')
 	parser.add_argument('--save_dir', type=str, default='models',
 		help='directory to store checkpointed models')
-	parser.add_argument('--rnn_size', type=int, default=512,
+	parser.add_argument('--rnn_size', type=int, default=16,
 		help='size of RNN hidden state')
 	parser.add_argument('--num_layers', type=int, default=2,
 		help='number of layers in the RNN')
@@ -44,6 +44,8 @@ def parse_args():
 		help='clip gradients at this value')
 	parser.add_argument('--learning_rate', type=float, default=0.002,
 		help='learning rate')
+	parser.add_argument('--learning_rate_dis', type=float, default=0.002,
+		help='learning rate for discriminator')
 	parser.add_argument('--decay_rate', type=float, default=0.97,
 		help='decay rate for rmsprop')
 	parser.add_argument('--keep_prob', type=float, default=0.5,
@@ -125,20 +127,20 @@ def train_discriminator(args, load_recent=True):
 	logging.debug('Vocabulary...')
 	with open(os.path.join(args.save_dir, 'config.pkl'), 'w') as f:
 		cPickle.dump(args, f)
-	with open(os.path.join(args.save_dir, 'real_beer_vocab.pkl'), 'w') as f:
+	with open(os.path.join(args.save_dir, 'combined_vocab.pkl'), 'w') as f:
 		cPickle.dump((batcher.chars, batcher.vocab), f)
 
-	logging.debug('Creating generator...')
+	logging.debug('Creating discriminator...')
 	discriminator = Discriminator(args, is_training = True)
 
 	with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as sess:
-		tf.initializer_all_variables().run()
+		tf.initialize_all_variables().run()
 		saver = tf.train.Saver(tf.all_variables())
 
-		if load_recent:
-			ckpt = tf.train.get_checkpoint_state(args.save_dir)
-			if ckpt and ckpt.model_checkpoint_path:
-				saver.restore(sess, ckpt.model_checkpoint_path)
+		# if load_recent:
+		# 	ckpt = tf.train.get_checkpoint_state(args.save_dir)
+		# 	if ckpt and ckpt.model_checkpoint_path:
+		# 		saver.restore(sess, ckpt.model_checkpoint_path)
 
 		for epoch in xrange(args.num_epochs_dis):
 			# Anneal learning rate
@@ -150,6 +152,8 @@ def train_discriminator(args, load_recent=True):
 			for batch in xrange(batcher.num_batches):
 				start = time.time()
 				x, y  = batcher.next_batch()
+				print x
+				print y
 				feed  = {discriminator.input_data: x, 
 						 discriminator.targets: y, 
 						 discriminator.initial_state: state}
@@ -172,9 +176,9 @@ def train_discriminator(args, load_recent=True):
 
 if __name__=='__main__':	
 	args = parse_args()
-	with tf.device('/gpu:3'):
-		train_discriminator(args, load_recent=True)
-
+	# with tf.device('/gpu:3'):
+	# 	train_discriminator(args, load_recent=True)
+	train_discriminator(args, load_recent=True)
 
 	# with tf.device('/gpu:3'):
 	# 	train_generator(args, load_recent=True)
