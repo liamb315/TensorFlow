@@ -46,17 +46,17 @@ class Discriminator(object):
                     tf.get_variable_scope().reuse_variables()                    
                 output, state = self.cell(inp, state)
                 outputs.append(output)
-
             last_state = state
+
         output_tf = tf.reshape(tf.concat(1, outputs), [-1, args.rnn_size])
         self.logits = tf.nn.xw_plus_b(output_tf, softmax_w, softmax_b)
         self.probs  = tf.nn.softmax(self.logits)
-
+        
         # Compute loss
-        loss = seq2seq.sequence_loss_by_example([self.logits],
+        loss = seq2seq.sequence_loss_by_example(
+            [self.logits],
             [tf.reshape(self.targets, [-1])],
-            [tf.ones([args.batch_size * args.seq_length])],
-            1)
+            [tf.ones([args.batch_size * args.seq_length])])
         self.cost = tf.reduce_sum(loss) / args.batch_size / args.seq_length
 
         self.final_state = last_state

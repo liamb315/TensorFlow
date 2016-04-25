@@ -152,8 +152,7 @@ def train_discriminator(args, load_recent=True):
 			for batch in xrange(batcher.num_batches):
 				start = time.time()
 				x, y  = batcher.next_batch()
-				print x
-				print y
+
 				feed  = {discriminator.input_data: x, 
 						 discriminator.targets: y, 
 						 discriminator.initial_state: state}
@@ -161,6 +160,8 @@ def train_discriminator(args, load_recent=True):
 												discriminator.final_state,
 												discriminator.train_op], 
 												feed)
+				# print discriminator.probs(np.ones(100*200)).eval()
+				print sess.run(discriminator.probs( np.ones([100,200]) ) )
 				end   = time.time()
 				
 				print '{}/{} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}' \
