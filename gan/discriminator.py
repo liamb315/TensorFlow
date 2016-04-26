@@ -62,6 +62,6 @@ class Discriminator(object):
         self.final_state = last_state
         self.lr          = tf.Variable(0.0, trainable = False)
         tvars            = tf.trainable_variables()
-        grads, _         = tf.clip_by_global_norm(tf.gradients(self.cost, tvars), args.grad_clip)
+        grads, _         = tf.clip_by_global_norm(tf.gradients(self.cost, tvars, aggregation_method=2), args.grad_clip)
         optimizer        = tf.train.AdamOptimizer(self.lr)
         self.train_op    = optimizer.apply_gradients(zip(grads, tvars))

@@ -11,7 +11,7 @@ from generator import Generator
 
 def parse_args():
     parser = ArgumentParser()
-    parser.add_argument('--save_dir', type=str, default='models',
+    parser.add_argument('--save_dir', type=str, default='experimental_models',
                        help='model directory to store checkpointed models')
     parser.add_argument('--data_dir', type=str, default='data',
                         help='data directory containing reviews')
@@ -34,8 +34,8 @@ def sample(args, num_samples = 10):
         ckpt = tf.train.get_checkpoint_state(args.save_dir)
         if ckpt and ckpt.model_checkpoint_path:
             saver.restore(sess, ckpt.model_checkpoint_path)
-            for _ in range(num_samples):
-                print model.sample(sess, chars, vocab, args.n, args.prime)
+            for i in range(num_samples):
+                print 'Review: ',i,': ', model.sample(sess, chars, vocab, args.n, args.prime), '\n'
             
 if __name__ == '__main__':
     args = parse_args()
