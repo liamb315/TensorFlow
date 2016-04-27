@@ -3,7 +3,10 @@ import numpy as np
 from tensorflow.models.rnn import rnn_cell
 from tensorflow.models.rnn import rnn
 from tensorflow.models.rnn import seq2seq
-
+from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import nn_ops
+from tensorflow.python.ops import math_ops
+from tensorflow.python.framework import ops
 
 class Discriminator(object):
     def __init__(self, args, is_training=True):
@@ -29,8 +32,8 @@ class Discriminator(object):
         self.initial_state = self.cell.zero_state(args.batch_size, tf.float32)
 
         with tf.variable_scope('rnn'):
-            softmax_w = tf.get_variable('softmax_w', [args.rnn_size, 1])
-            softmax_b = tf.get_variable('softmax_b', [1])
+            softmax_w = tf.get_variable('softmax_w', [args.rnn_size, 2])
+            softmax_b = tf.get_variable('softmax_b', [2])
 
             with tf.device('/cpu:0'):
                 embedding = tf.get_variable('embedding', [args.vocab_size, args.rnn_size])
@@ -52,11 +55,13 @@ class Discriminator(object):
         self.logits = tf.nn.xw_plus_b(output_tf, softmax_w, softmax_b)
         self.probs  = tf.nn.softmax(self.logits)
         
-        # Compute loss
+        # Compute loss (evaluates to 0.0)
         loss = seq2seq.sequence_loss_by_example(
             [self.logits],
             [tf.reshape(self.targets, [-1])],
-            [tf.ones([args.batch_size * args.seq_length])])
+            [tf.ones([args.batch_size * args.seq_length])],
+            2)
+
         self.cost = tf.reduce_sum(loss) / args.batch_size / args.seq_length
 
         self.final_state = last_state
