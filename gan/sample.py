@@ -11,7 +11,7 @@ from generator import Generator
 
 def parse_args():
     parser = ArgumentParser()
-    parser.add_argument('--save_dir', type=str, default='experimental_models',
+    parser.add_argument('--save_dir', type=str, default='models_generator',
                        help='model directory to store checkpointed models')
     parser.add_argument('--data_dir', type=str, default='data',
                         help='data directory containing reviews')
