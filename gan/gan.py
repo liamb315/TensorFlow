@@ -178,7 +178,7 @@ def train_discriminator(args, load_recent=True):
 if __name__=='__main__':	
 	args = parse_args()
 	with tf.device('/gpu:3'):
-		train_discriminator(args, load_recent=False)
+		train_discriminator(args, load_recent=True)
 
 	# with tf.device('/gpu:3'):
 	# 	train_generator(args, load_recent=True)
