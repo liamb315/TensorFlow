@@ -42,7 +42,6 @@ class Discriminator(object):
 
             state   = self.initial_state
             outputs = []
-            prev    = None
 
             for i, inp in enumerate(inputs):
                 if i > 0:

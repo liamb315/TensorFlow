@@ -1,194 +1,71 @@
 import tensorflow as tf
 import numpy as np
-import logging
-from tensorflow.models.rnn import *
-from argparse import ArgumentParser
-from batcher import Batcher, DiscriminatorBatcher
-from generator import Generator
-from discriminator import Discriminator
-import time
-import os
-import cPickle
+from tensorflow.models.rnn import rnn_cell
+from tensorflow.models.rnn import rnn
+from tensorflow.models.rnn import seq2seq
+from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import nn_ops
+from tensorflow.python.ops import math_ops
+from tensorflow.python.framework import ops
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+class GAN(object):
+	def __init__(self, args, is_training=True):
+		self.args = args
 
+		# if not is_training:
+		# 	args.batch_size = 1
+		# 	args.seq_length = 1
 
-def parse_args():
-	parser = ArgumentParser()
-	parser.add_argument('--data_dir', type=str, default='data',
-		help='data directory containing reviews')
-	parser.add_argument('--save_dir_gen', type=str, default='models_generator',
-		help='directory to store checkpointed generator models')
-	parser.add_argument('--save_dir_dis', type=str, default='models_discriminator',
-		help='directory to store checkpointed discriminator models')
-	parser.add_argument('--rnn_size', type=int, default=2048,
-		help='size of RNN hidden state')
-	parser.add_argument('--num_layers', type=int, default=2,
-		help='number of layers in the RNN')
-	parser.add_argument('--model', type=str, default='lstm',
-		help='rnn, gru, or lstm')
-	parser.add_argument('--batch_size', type=int, default=100,
-		help='minibatch size')
-	parser.add_argument('--seq_length', type=int, default=200,
-		help='RNN sequence length')
-	parser.add_argument('-n', type=int, default=500,
-		help='number of characters to sample')
-	parser.add_argument('--prime', type=str, default=' ',
-		help='prime text')
-	parser.add_argument('--num_epochs', type=int, default=5,
-		help='number of epochs')
-	parser.add_argument('--num_epochs_dis', type=int, default=5,
-		help='number of epochs to train discriminator')
-	parser.add_argument('--save_every', type=int, default=50,
-		help='save frequency')
-	parser.add_argument('--grad_clip', type=float, default=5.,
-		help='clip gradients at this value')
-	parser.add_argument('--learning_rate', type=float, default=0.002,
-		help='learning rate')
-	parser.add_argument('--learning_rate_dis', type=float, default=0.0002,
-		help='learning rate for discriminator')
-	parser.add_argument('--decay_rate', type=float, default=0.97,
-		help='decay rate for rmsprop')
-	parser.add_argument('--keep_prob', type=float, default=0.5,
-		help='keep probability for dropout')
-	parser.add_argument('--vocab_size', type=float, default=100,
-		help='size of the vocabulary (characters)')
-	return parser.parse_args()
+		if args.model == 'rnn':
+			self.cell = rnn_cell.BasicRNNCell(args.rnn_size)
+		if args.model == 'gru':
+			self.cell = rnn_cell.GRUCell(args.rnn_size)
+		if args.model == 'lstm':
+			self.cell = rnn_cell.BasicLSTMCell(args.rnn_size)
+		else:
+			raise Exception('model type not supported: {}'.format(args.model))
 
+		self.cell = rnn_cell.MultiRNNCell([self.cell] * args.num_layers)
 
-def train_generator(args, load_recent=True):
-	'''Train the generator via classical approach'''
-	logging.debug('Batcher...')
-	batcher   = Batcher(args.data_dir, args.batch_size, args.seq_length)
+		# Pass a tensor of probabilities over the characters to the model
+		self.input_data    = tf.placeholder(tf.float32, [args.batch_size, args.seq_length, args.vocab_size])
+		self.targets       = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
+		self.initial_state = self.cell.zero_state(args.batch_size, tf.float32)
 
-	logging.debug('Vocabulary...')
-	with open(os.path.join(args.save_dir_gen, 'config.pkl'), 'w') as f:
-		cPickle.dump(args, f)
-	with open(os.path.join(args.save_dir_gen, 'real_beer_vocab.pkl'), 'w') as f:
-		cPickle.dump((batcher.chars, batcher.vocab), f)
+		with tf.variable_scope('rnn'):
+			softmax_w = tf.get_variable('softmax_w', [args.rnn_size, 2], trainable = False)
+			softmax_b = tf.get_variable('softmax_b', [2], trainable = False)
 
-	logging.debug('Creating generator...')
-	generator = Generator(args, is_training = True)
+			# TODO: Determine appropriate structure for inputs
+			# inputs = 
 
-	with tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)) as sess:
-		tf.initialize_all_variables().run()
-		saver = tf.train.Saver(tf.all_variables())
+			state   = self.initial_state
+			outputs = []
 
-		if load_recent:
-			ckpt = tf.train.get_checkpoint_state(args.save_dir_gen)
-			if ckpt and ckpt.model_checkpoint_path:
-				saver.restore(sess, ckpt.model_checkpoint_path)
+			for i, inp in enumerate(inputs):
+				if i > 0:
+					tf.get_variable_scope().reuse_variables()
+				output, state = self.cell(inp, state)
+				outputs.append(output)
+			last_state = state
 
-		for epoch in xrange(args.num_epochs):
-			# Anneal learning rate
-			new_lr = args.learning_rate * (args.decay_rate ** epoch)
-			sess.run(tf.assign(generator.lr, new_lr))
-			batcher.reset_batch_pointer()
-			state = generator.initial_state.eval()
+			output_tf   = tf.reshape(tf.concat(1, outputs), [-1, args.rnn_size])
+			self.logits = tf.nn.xw_plus_b(output_tf, softmax_w, softmax_b)
+			self.probs  = tf.nn.softmax(self.logits)
 
-			for batch in xrange(batcher.num_batches):
-				start = time.time()
-				x, y  = batcher.next_batch()
-				feed  = {generator.input_data: x, generator.targets: y, generator.initial_state: state}
-				train_loss, state, _ = sess.run([generator.cost, generator.final_state, generator.train_op], feed)
-				end   = time.time()
-				
-				print '{}/{} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}' \
-					.format(epoch * batcher.num_batches + batch,
-						args.num_epochs * batcher.num_batches,
-						epoch, train_loss, end - start)
-				
-				if (epoch * batcher.num_batches + batch) % args.save_every == 0:
-					checkpoint_path = os.path.join(args.save_dir_gen, 'model.ckpt')
-					saver.save(sess, checkpoint_path, global_step = epoch * batcher.num_batches + batch)
-					print 'Generator model saved to {}'.format(checkpoint_path)
+			loss = seq2seq.sequence_loss_by_example(
+				[self.logits],
+				[tf.reshape(self.targets, [-1])], 
+				[tf.ones([args.batch_size * args.seq_length])],
+				2)
 
+			self.cost = tf.reduce_sum(loss) / args.batch_size / args.seq_length
 
-def generate_sample(args):
-	'''Generate a text sample from the most recent saved checkpoint'''
-	with open(os.path.join(args.save_dir_gen, 'config.pkl')) as f:
-		saved_args = cPickle.load(f)
-	with open(os.path.join(args.save_dir_gen, 'real_beer_vocab.pkl')) as f:
-		chars, vocab = cPickle.load(f)
-	model = Generator(saved_args, is_training = False)
-	with tf.Session() as sess:
-		tf.initialize_all_variables().run()
-		saver = tf.train.Saver(tf.all_variables())
-		ckpt = tf.train.get_checkpoint_state(args.save_dir_gen)
-		if ckpt and ckpt.model_checkpoint_path:
-			saver.restore(sess, ckpt.model_checkpoint_path)
-			print model.sample(sess, chars, vocab, args.n, args.prime)
+			self.final_state = last_state
+			self.lr          = tf.Variable(0.0, trainable = False)
+			tvars 	         = tf.trainable_variables()
+			grads, _         = tf.clip_by_global_norm(tf.gradients(self.cost, tvars, aggregation_method = 2), args.grad_clip)
+			optimizer        = tf.train.AdamOptimizer(self.lr)
+			self.train_op    = optimizer.apply_gradients(zip(grads, tvars))
 
-
-def train_discriminator(args, load_recent=True):
-	'''Train the discriminator via classical approach'''
-	logging.debug('Batcher...')
-	batcher  = DiscriminatorBatcher(args.data_dir, args.batch_size, args.seq_length)
-
-	logging.debug('Vocabulary...')
-	with open(os.path.join(args.save_dir_dis, 'config.pkl'), 'w') as f:
-		cPickle.dump(args, f)
-	with open(os.path.join(args.save_dir_dis, 'combined_vocab.pkl'), 'w') as f:
-		cPickle.dump((batcher.chars, batcher.vocab), f)
-
-	logging.debug('Creating discriminator...')
-	discriminator = Discriminator(args, is_training = True)
-
-	with tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)) as sess:
-		tf.initialize_all_variables().run()
-		saver = tf.train.Saver(tf.all_variables())
-
-		if load_recent:
-			ckpt = tf.train.get_checkpoint_state(args.save_dir_dis)
-			if ckpt and ckpt.model_checkpoint_path:
-				saver.restore(sess, ckpt.model_checkpoint_path)
-
-		for epoch in xrange(args.num_epochs_dis):
-			# Anneal learning rate
-			new_lr = args.learning_rate_dis * (args.decay_rate ** epoch)
-			sess.run(tf.assign(discriminator.lr, new_lr))
-			batcher.reset_batch_pointer()
-			state = discriminator.initial_state.eval()
-
-			for batch in xrange(batcher.num_batches):
-				start = time.time()
-				x, y  = batcher.next_batch()
-
-				feed  = {discriminator.input_data: x, 
-						 discriminator.targets: y, 
-						 discriminator.initial_state: state}
-				train_loss, state, _ = sess.run([discriminator.cost,
-												discriminator.final_state,
-												discriminator.train_op], 
-												feed)
-				end   = time.time()
-				
-				print '{}/{} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}' \
-					.format(epoch * batcher.num_batches + batch,
-						args.num_epochs * batcher.num_batches,
-						epoch, train_loss, end - start)
-				
-				if (epoch * batcher.num_batches + batch) % args.save_every == 0:
-					checkpoint_path = os.path.join(args.save_dir_dis, 'discriminator.ckpt')
-					saver.save(sess, checkpoint_path, global_step = epoch * batcher.num_batches + batch)
-					print 'Discriminator model saved to {}'.format(checkpoint_path)
-
-
-if __name__=='__main__':	
-	args = parse_args()
-	with tf.device('/gpu:3'):
-		train_discriminator(args, load_recent=True)
-
-	# with tf.device('/gpu:3'):
-	# 	train_generator(args, load_recent=True)
-
-	# with tf.device('/gpu:3'):
-	# 	train_generator(args, load_recent=True)
-	
-	# generate_sample(args)
-
-
-
-
-	# #sess.close()
+			
