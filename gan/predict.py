@@ -33,9 +33,8 @@ def predict(args):
 
 if __name__=='__main__':
     args = parse_args()
-    probs = predict(args)
+    with tf.device('/gpu:3'):
+        probs = predict(args)
+    
     for char, prob in zip(args.text, probs):
-        print char, prob[0][1]
-
-    # with tf.device('/gpu:3'):
-    #     predict(args)
+        print char, prob

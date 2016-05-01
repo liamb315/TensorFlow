@@ -55,7 +55,6 @@ class Discriminator(object):
         self.logits = tf.nn.xw_plus_b(output_tf, softmax_w, softmax_b)
         self.probs  = tf.nn.softmax(self.logits)
         
-        # Compute loss (evaluates to 0.0)
         loss = seq2seq.sequence_loss_by_example(
             [self.logits],
             [tf.reshape(self.targets, [-1])],
