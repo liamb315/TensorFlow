@@ -71,5 +71,18 @@ class Discriminator(object):
         optimizer        = tf.train.AdamOptimizer(self.lr)
         self.train_op    = optimizer.apply_gradients(zip(grads, tvars))
 
-    def predict(self, num_seq):
-        pass
+    def predict(self, sess, chars, vocab):
+        '''Predict a seqeuence of chars using the current model'''
+        state = self.cell.zero_state(self.args.batch_size, tf.float32).eval()
+        probabilities, num_seq = [], []
+
+        for char in chars:
+            num_seq.append(vocab[char])
+
+        for num in num_seq:
+            x = np.array([[num]])
+            feed = {self.input_data: x, self.initial_state: state}
+            [probs, state] = sess.run([self.probs, self.final_state], feed)
+            probabilities.append(probs)
+
+        return probabilities

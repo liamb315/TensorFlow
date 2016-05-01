@@ -1,11 +1,9 @@
 import numpy as np
 import tensorflow as tf
-
 from argparse import ArgumentParser
 import time
 import os
 import cPickle
-
 from batcher import Batcher
 from generator import Generator
 
@@ -27,7 +25,7 @@ def sample(args, num_samples = 10):
         saved_args = cPickle.load(f)
     with open(os.path.join(args.save_dir, 'real_beer_vocab.pkl')) as f:
         chars, vocab = cPickle.load(f)
-    model = Generator(saved_args, False)
+    model = Generator(saved_args, is_training = False)
     with tf.Session() as sess:
         tf.initialize_all_variables().run()
         saver = tf.train.Saver(tf.all_variables())
