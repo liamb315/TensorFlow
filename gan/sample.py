@@ -33,11 +33,11 @@ def sample(args, num_samples = 10):
         if ckpt and ckpt.model_checkpoint_path:
             saver.restore(sess, ckpt.model_checkpoint_path)
             for i in range(num_samples):
-                print 'Review: ',i,': ', model.sample(sess, chars, vocab, args.n, args.prime), '\n'
+                print 'Review',i,':', model.sample(sess, chars, vocab, args.n, args.prime), '\n'
             
 if __name__ == '__main__':
     args = parse_args()
-    with tf.device('/gpu:3'):
+    with tf.device('/gpu:2'):
         sample(args)    
 
     
