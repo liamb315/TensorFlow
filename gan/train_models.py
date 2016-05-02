@@ -29,7 +29,7 @@ def parse_args():
 		help='number of layers in the RNN')
 	parser.add_argument('--model', type=str, default='lstm',
 		help='rnn, gru, or lstm')
-	parser.add_argument('--batch_size', type=int, default=50,
+	parser.add_argument('--batch_size', type=int, default=100,
 		help='minibatch size')
 	parser.add_argument('--seq_length', type=int, default=200,
 		help='RNN sequence length')
@@ -122,7 +122,7 @@ def generate_sample(args):
 			print model.sample(sess, chars, vocab, args.n, args.prime)
 
 
-def train_discriminator(args, load_recent=True):
+def train_discriminator(args, load_recent_weights = 'Generator'):
 	'''Train the discriminator via classical approach'''
 	logging.debug('Batcher...')
 	batcher  = DiscriminatorBatcher(args.data_dir, args.batch_size, args.seq_length)
@@ -130,20 +130,47 @@ def train_discriminator(args, load_recent=True):
 	logging.debug('Vocabulary...')
 	with open(os.path.join(args.save_dir_dis, 'config.pkl'), 'w') as f:
 		cPickle.dump(args, f)
-	with open(os.path.join(args.save_dir_dis, 'combined_vocab.pkl'), 'w') as f:
-		cPickle.dump((batcher.chars, batcher.vocab), f)
+	if load_recent_weights is 'Generator':
+		with open(os.path.join(args.save_dir_dis, 'real_beer_vocab.pkl'), 'w') as f:
+			cPickle.dump((batcher.chars, batcher.vocab), f)
+	else:
+		with open(os.path.join(args.save_dir_dis, 'combined_vocab.pkl'), 'w') as f:
+			cPickle.dump((batcher.chars, batcher.vocab), f)
+
+
 
 	logging.debug('Creating discriminator...')
 	discriminator = Discriminator(args, is_training = True)
 
 	with tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)) as sess:
 		tf.initialize_all_variables().run()
-		saver = tf.train.Saver(tf.all_variables())
-
-		if load_recent:
-			ckpt = tf.train.get_checkpoint_state(args.save_dir_dis)
+		
+		if load_recent_weights is 'Discriminator':
+			logging.debug('Loading recent Discriminator weights...')
+			saver = tf.train.Saver(tf.all_variables())
+			ckpt  = tf.train.get_checkpoint_state(args.save_dir_dis)
 			if ckpt and ckpt.model_checkpoint_path:
 				saver.restore(sess, ckpt.model_checkpoint_path)
+
+		if load_recent_weights is 'Generator':
+			logging.debug('Loading recent Generator weights...')
+
+			vars_all    = tf.all_variables()
+			# Only retrieve non-softmax weights
+			vars_subset = [var for var in vars_all if 'softmax' not in var.op.name]
+			vars_dict   = {}
+			for var in vars_subset:
+				var_key = var.op.name.replace('_discriminator', '') 
+				vars_dict[var_key] = var
+			saver = tf.train.Saver(vars_dict)
+
+			ckpt = tf.train.get_checkpoint_state(args.save_dir_gen)
+			if ckpt and ckpt.model_checkpoint_path:
+				saver.restore(sess, ckpt.model_checkpoint_path)
+
+		else:
+			logging.debug('Randomly initialized weights...')
+			saver = tf.train.Saver(tf.all_variables())
 
 		for epoch in xrange(args.num_epochs_dis):
 			# Anneal learning rate
@@ -179,7 +206,7 @@ def train_discriminator(args, load_recent=True):
 if __name__=='__main__':	
 	args = parse_args()
 	with tf.device('/gpu:3'):
-		train_discriminator(args, load_recent=True)
+		train_discriminator(args, load_recent_weights='Generator')
 
 	# with tf.device('/gpu:3'):
 	# 	train_generator(args, load_recent=True)
