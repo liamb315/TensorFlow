@@ -47,7 +47,7 @@ def parse_args():
 		help='clip gradients at this value')
 	parser.add_argument('--learning_rate', type=float, default=0.002,
 		help='learning rate')
-	parser.add_argument('--learning_rate_dis', type=float, default=0.0002,
+	parser.add_argument('--learning_rate_dis', type=float, default=0.0001,
 		help='learning rate for discriminator')
 	parser.add_argument('--decay_rate', type=float, default=0.97,
 		help='decay rate for rmsprop')
@@ -206,7 +206,7 @@ def train_discriminator(args, load_recent_weights = 'Generator'):
 if __name__=='__main__':	
 	args = parse_args()
 	with tf.device('/gpu:3'):
-		train_discriminator(args, load_recent_weights='Generator')
+		train_discriminator(args, load_recent_weights='Discriminator')
 
 	# with tf.device('/gpu:3'):
 	# 	train_generator(args, load_recent=True)
