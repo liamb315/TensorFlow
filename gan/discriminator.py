@@ -40,6 +40,7 @@ class Discriminator(object):
                 inputs    = tf.split(1, args.seq_length, tf.nn.embedding_lookup(embedding, self.input_data))
                 inputs    = [tf.squeeze(i, [1]) for i in inputs]
 
+            self.inputs = inputs
             state   = self.initial_state
             outputs = []
 

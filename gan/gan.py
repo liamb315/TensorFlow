@@ -36,8 +36,11 @@ class GAN(object):
 			softmax_w = tf.get_variable('softmax_w', [args.rnn_size, 2], trainable = False)
 			softmax_b = tf.get_variable('softmax_b', [2], trainable = False)
 
-			# TODO: Determine appropriate structure for inputs
-			# inputs = 
+			embedding = tf.get_variable('embedding', [args.vocab_size, args.rnn_size])
+			inputs    = tf.split(1, args.seq_length, self.input_data)
+			inputs    = [tf.matmul(tf.squeeze(i), embedding) for i in inputs]
+
+			self.inputs = inputs
 
 			state   = self.initial_state
 			outputs = []
@@ -68,4 +71,3 @@ class GAN(object):
 			optimizer        = tf.train.AdamOptimizer(self.lr)
 			self.train_op    = optimizer.apply_gradients(zip(grads, tvars))
 
-			
