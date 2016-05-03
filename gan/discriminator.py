@@ -31,7 +31,7 @@ class Discriminator(object):
         self.targets       = tf.placeholder(tf.int32, [args.batch_size, args.seq_length]) # Target replication
         self.initial_state = self.cell.zero_state(args.batch_size, tf.float32)
 
-        with tf.variable_scope('rnn_discriminator'):
+        with tf.variable_scope('rnn'):
             softmax_w = tf.get_variable('softmax_w', [args.rnn_size, 2])
             softmax_b = tf.get_variable('softmax_b', [2])
 

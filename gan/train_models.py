@@ -47,7 +47,7 @@ def parse_args():
 		help='clip gradients at this value')
 	parser.add_argument('--learning_rate', type=float, default=0.002,
 		help='learning rate')
-	parser.add_argument('--learning_rate_dis', type=float, default=0.0001,
+	parser.add_argument('--learning_rate_dis', type=float, default=0.0002,
 		help='learning rate for discriminator')
 	parser.add_argument('--decay_rate', type=float, default=0.97,
 		help='decay rate for rmsprop')
@@ -130,48 +130,35 @@ def train_discriminator(args, load_recent_weights = 'Generator'):
 	logging.debug('Vocabulary...')
 	with open(os.path.join(args.save_dir_dis, 'config.pkl'), 'w') as f:
 		cPickle.dump(args, f)
-	if load_recent_weights is 'Generator':
-		with open(os.path.join(args.save_dir_dis, 'real_beer_vocab.pkl'), 'w') as f:
-			cPickle.dump((batcher.chars, batcher.vocab), f)
-	else:
-		with open(os.path.join(args.save_dir_dis, 'combined_vocab.pkl'), 'w') as f:
-			cPickle.dump((batcher.chars, batcher.vocab), f)
-
-
+	with open(os.path.join(args.save_dir_dis, 'real_beer_vocab.pkl'), 'w') as f:
+		cPickle.dump((batcher.chars, batcher.vocab), f)
 
 	logging.debug('Creating discriminator...')
 	discriminator = Discriminator(args, is_training = True)
 
 	with tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)) as sess:
 		tf.initialize_all_variables().run()
-		
+		saver = tf.train.Saver(tf.all_variables())
+
 		if load_recent_weights is 'Discriminator':
 			logging.debug('Loading recent Discriminator weights...')
-			saver = tf.train.Saver(tf.all_variables())
 			ckpt  = tf.train.get_checkpoint_state(args.save_dir_dis)
 			if ckpt and ckpt.model_checkpoint_path:
 				saver.restore(sess, ckpt.model_checkpoint_path)
 
-		if load_recent_weights is 'Generator':
+		elif load_recent_weights is 'Generator':
 			logging.debug('Loading recent Generator weights...')
-
-			vars_all    = tf.all_variables()
-			# Only retrieve non-softmax weights
-			vars_subset = [var for var in vars_all if 'softmax' not in var.op.name]
-			vars_dict   = {}
-			for var in vars_subset:
-				var_key = var.op.name.replace('_discriminator', '') 
-				vars_dict[var_key] = var
-			saver = tf.train.Saver(vars_dict)
-
+			# Only retrieve non-softmax weights from generator model
+			vars_all  = tf.all_variables()
+			vars_gen  = [var for var in vars_all if 'softmax' not in var.op.name]
+			saver_gen = tf.train.Saver(vars_gen)
 			ckpt = tf.train.get_checkpoint_state(args.save_dir_gen)
 			if ckpt and ckpt.model_checkpoint_path:
-				saver.restore(sess, ckpt.model_checkpoint_path)
-
+				saver_gen.restore(sess, ckpt.model_checkpoint_path)
+				
 		else:
-			logging.debug('Randomly initialized weights...')
-			saver = tf.train.Saver(tf.all_variables())
-
+			raise Exception('Must initialize weights from either Generator or Discriminator')
+			
 		for epoch in xrange(args.num_epochs_dis):
 			# Anneal learning rate
 			new_lr = args.learning_rate_dis * (args.decay_rate ** epoch)
@@ -206,6 +193,7 @@ def train_discriminator(args, load_recent_weights = 'Generator'):
 if __name__=='__main__':	
 	args = parse_args()
 	with tf.device('/gpu:3'):
+		# train_discriminator(args, load_recent_weights='Generator')
 		train_discriminator(args, load_recent_weights='Discriminator')
 
 	# with tf.device('/gpu:3'):
