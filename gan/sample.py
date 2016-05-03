@@ -15,7 +15,7 @@ def parse_args():
                         help='data directory containing reviews')
     parser.add_argument('-n', type=int, default=500,
                        help='number of characters to sample')
-    parser.add_argument('--prime', type=str, default=' ',
+    parser.add_argument('--prime', type=str, default='This is an ',
                        help='prime text')
     return parser.parse_args()
     
@@ -25,7 +25,7 @@ def sample(args, num_samples = 10):
         saved_args = cPickle.load(f)
     with open(os.path.join(args.save_dir, 'real_beer_vocab.pkl')) as f:
         chars, vocab = cPickle.load(f)
-    model = Generator(saved_args, is_training = False)
+    generator = Generator(saved_args, is_training = False)
     with tf.Session() as sess:
         tf.initialize_all_variables().run()
         saver = tf.train.Saver(tf.all_variables())
@@ -33,12 +33,16 @@ def sample(args, num_samples = 10):
         if ckpt and ckpt.model_checkpoint_path:
             saver.restore(sess, ckpt.model_checkpoint_path)
             for i in range(num_samples):
-                print 'Review',i,':', model.sample(sess, chars, vocab, args.n, args.prime), '\n'
+                print 'Review',i,':', generator.sample(sess, chars, vocab, args.n, args.prime), '\n'
+
+            # return generator.sample_probabilities(sess, chars, vocab, args.n, args.prime)
             
 if __name__ == '__main__':
     args = parse_args()
-    with tf.device('/gpu:2'):
-        sample(args)    
+    with tf.device('/gpu:3'):
+        sample(args)
+        # prob_list = sample(args)    
+
 
     
 

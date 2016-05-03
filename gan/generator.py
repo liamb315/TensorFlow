@@ -64,7 +64,7 @@ class Generator(object):
         for char in initial[:-1]:
             x       = np.zeros((1,1))
             x[0,0]  = vocab[char]
-            feed    = {self.input_data: x, self.intitial_state: state}
+            feed    = {self.input_data: x, self.initial_state: state}
             [state] = sess.run([self.final_state], feed)
 
         sequence = initial
@@ -82,3 +82,24 @@ class Generator(object):
         return sequence
 
 
+    def sample_probabilities(self, sess, chars, vocab, seq_length = 200, initial=''):
+        state = self.cell.zero_state(1, tf.float32).eval()
+        for char in initial[:-1]:
+            x       = np.zeros((1,1))
+            x[0,0]  = vocab[char]
+            feed    = {self.input_data: x, self.initial_state: state}
+            [state] = sess.run([self.final_state], feed)
+
+        probability_sequence = []
+        char = initial[-1]
+        for n in xrange(seq_length):
+            x = np.zeros((1,1))
+            x[0,0] = vocab[char]
+            feed = {self.input_data: x, self.initial_state: state}
+            [probs, state] = sess.run([self.probs, self.final_state], feed)
+            p  = probs[0]
+            probability_sequence.append(p)
+            sample = int(np.random.choice(len(p), p=p))
+            pred = chars[sample]
+            char = pred
+        return probability_sequence

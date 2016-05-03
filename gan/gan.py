@@ -12,9 +12,9 @@ class GAN(object):
 	def __init__(self, args, is_training=True):
 		self.args = args
 
-		# if not is_training:
-		# 	args.batch_size = 1
-		# 	args.seq_length = 1
+		if not is_training:
+			args.batch_size = 1
+			args.seq_length = 1
 
 		if args.model == 'rnn':
 			self.cell = rnn_cell.BasicRNNCell(args.rnn_size)
