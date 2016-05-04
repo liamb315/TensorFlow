@@ -16,6 +16,8 @@ class GAN(object):
 			args.batch_size = 1
 			args.seq_length = 1
 
+		# TODO
+		# Set all variables within rnn_cell to be trainable=False
 		if args.model == 'rnn':
 			self.cell = rnn_cell.BasicRNNCell(args.rnn_size)
 		if args.model == 'gru':
@@ -38,7 +40,7 @@ class GAN(object):
 
 			embedding = tf.get_variable('embedding', [args.vocab_size, args.rnn_size])
 			inputs    = tf.split(1, args.seq_length, self.input_data)
-			inputs    = [tf.matmul(tf.squeeze(i), embedding) for i in inputs]
+			inputs    = [tf.matmul(tf.squeeze(i, [1]), embedding) for i in inputs]
 
 			self.inputs = inputs
 

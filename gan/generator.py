@@ -81,7 +81,6 @@ class Generator(object):
             char = pred
         return sequence
 
-
     def sample_probabilities(self, sess, chars, vocab, seq_length = 200, initial=''):
         state = self.cell.zero_state(1, tf.float32).eval()
         for char in initial[:-1]:
@@ -103,3 +102,26 @@ class Generator(object):
             pred = chars[sample]
             char = pred
         return probability_sequence
+
+
+    def batch_sample_with_temperature(logits, temperature=1.0):
+        ''' This function is like sample_with_temperature except it can handle
+         batch input a of [batch_size x logits]  this function takes logits 
+         input, and produces a specific number from the array. This is all done
+         on the gpu because this function uses tensorflow.  As you increase the
+        temperature, you will get more diversified output but with more errors 
+        (usually gramatical if you're doing text)
+
+        args: 
+            Logits -- this must be a 2d array [batch_size x logits]
+            Temperature -- how much variance you want in output
+        
+        returns:
+            Selected number from distribution
+        '''
+        # Reduction of temperature, and get rid of negative numbers with exponent 
+        exponent_raised = tf.exp(tf.div(logits, temperature)) 
+        matrix_X = tf.div(exponent_raised, tf.reduce_sum(exponent_raised, reduction_indices = 1, keep_dims = True)) 
+        matrix_U = tf.random_uniform(logits.get_shape(), minval = 0, maxval = 1)
+        final_number = tf.argmax(tf.sub(matrix_X, matrix_U), dimension = 1) #you want dimension = 1 because you are argmaxing across rows.
+        return final_number

@@ -29,7 +29,7 @@ def parse_args():
 		help='number of layers in the RNN')
 	parser.add_argument('--model', type=str, default='lstm',
 		help='rnn, gru, or lstm')
-	parser.add_argument('--batch_size', type=int, default=100,
+	parser.add_argument('--batch_size', type=int, default=50,
 		help='minibatch size')
 	parser.add_argument('--seq_length', type=int, default=200,
 		help='RNN sequence length')
