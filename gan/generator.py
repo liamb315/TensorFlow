@@ -104,7 +104,7 @@ class Generator(object):
         return probability_sequence
 
 
-    def batch_sample_with_temperature(logits, temperature=1.0):
+    def batch_sample_with_temperature(self, logits, temperature=1.0):
         ''' This function is like sample_with_temperature except it can handle
          batch input a of [batch_size x logits]  this function takes logits 
          input, and produces a specific number from the array. This is all done
