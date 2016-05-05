@@ -17,22 +17,34 @@ class GAN(object):
 			args.seq_length = 1
 
 		# TODO
-		# Set all variables within rnn_cell to be trainable=False
+		# Set all variables within cell_dis to be trainable=False
 		if args.model == 'rnn':
-			self.cell = rnn_cell.BasicRNNCell(args.rnn_size)
+			sell.cell_gen = rnn_cell.BasicRNNCell(args.rnn_size)
+			sell.cell_dis = rnn_cell.BasicRNNCell(args.rnn_size)
 		if args.model == 'gru':
-			self.cell = rnn_cell.GRUCell(args.rnn_size)
+			sell.cell_gen = rnn_cell.GRUCell(args.rnn_size)
+			sell.cell_dis = rnn_cell.GRUCell(args.rnn_size)
 		if args.model == 'lstm':
-			self.cell = rnn_cell.BasicLSTMCell(args.rnn_size)
+			sell.cell_gen = rnn_cell.BasicLSTMCell(args.rnn_size)
+			sell.cell_dis = rnn_cell.BasicLSTMCell(args.rnn_size)
 		else:
 			raise Exception('model type not supported: {}'.format(args.model))
 
-		self.cell = rnn_cell.MultiRNNCell([self.cell] * args.num_layers)
+		sell.cell_gen = rnn_cell.MultiRNNCell([sell.cell_gen] * args.num_layers)
+		sell.cell_dis = rnn_cell.MultiRNNCell([sell.cell_dis] * args.num_layers)
+
+		# TODO 
+		# Generate self.input_data to the Discriminator
+		# 1.  Figure out how to do a batch of generated reviews in TF
+		#     a. Tie in sample_distribution the generator
+		# 2.  Use this batch of generated reviews to get the probabilities
+		# 3.  Pass this as self.input_data, ensuring differentiability
+
 
 		# Pass a tensor of probabilities over the characters to the model
 		self.input_data    = tf.placeholder(tf.float32, [args.batch_size, args.seq_length, args.vocab_size])
 		self.targets       = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
-		self.initial_state = self.cell.zero_state(args.batch_size, tf.float32)
+		self.initial_state = sell.cell_dis.zero_state(args.batch_size, tf.float32)
 
 		with tf.variable_scope('rnn'):
 			softmax_w = tf.get_variable('softmax_w', [args.rnn_size, 2], trainable = False)
@@ -50,7 +62,7 @@ class GAN(object):
 			for i, inp in enumerate(inputs):
 				if i > 0:
 					tf.get_variable_scope().reuse_variables()
-				output, state = self.cell(inp, state)
+				output, state = sell.cell_dis(inp, state)
 				outputs.append(output)
 			last_state = state
 
