@@ -35,15 +35,9 @@ def sample(args, num_samples = 10):
             # for i in range(num_samples):
             #     print 'Review',i,':', generator.generate(sess, chars, vocab, args.n, args.prime), '\n'
 
-            print generator.generate_batch(sess, saved_args, chars, vocab)
+            return generator.generate_batch(sess, saved_args, chars, vocab)
             
 if __name__ == '__main__':
     args = parse_args()
     with tf.device('/gpu:3'):
-        sample(args)
-        # prob_list = sample(args)    
-
-
-    
-
-
+        wat = sample(args)   

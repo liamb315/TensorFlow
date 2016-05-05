@@ -111,11 +111,12 @@ class Generator(object):
          input, and produces a specific number from the array. 
 
         args: 
-            logits:  this must be a 2d array [batch_size x logits]
-            temperature: how much variance you want in output
+            logits:  2d array [batch_size x logits]
+            temperature: hyperparameter to control variance of sampling
         
         returns:
-            Selected number from distribution
+            sequence_matrix: 1d array [batch_size] of selected numbers 
+                             from distribution
         '''
         exponent_raised = tf.exp(tf.div(logits, temperature)) 
         matrix_X = tf.div(exponent_raised, tf.reduce_sum(exponent_raised, 
@@ -125,45 +126,63 @@ class Generator(object):
         final_number = tf.argmax(tf.sub(matrix_X, matrix_U), dimension = 1) 
         return final_number
 
-    def generate_batch(self, sess, args, chars, vocab, seq_length = 200):
+    def sample_probs(self, probs):
+        ''' This function takes probs input, [batch_size x probs] and 
+            produces a specific number from the array. 
+
+        args: 
+            probs:  2d array [batch_size x probs]
+            temperature: hyperparameter to control variance of sampling
+        
+        returns:
+            sequence_matrix: 1d array [batch_size] of selected numbers 
+                             from distribution
+        '''
+        matrix_U = tf.random_uniform(probs.get_shape(), minval = 0, maxval = 1)
+        # You want dimension = 1 because you are argmaxing across rows.
+        final_number = tf.argmax(tf.sub(probs, matrix_U), dimension = 1) 
+        return final_number
+
+    # def generate_batch(self, sess, args, chars, vocab, seq_length = 200):
+    #     ''' Generate a batch of reviews entirely within TensorFlow'''
+
+    #     state = self.cell.zero_state(args.batch_size, tf.float32).eval()
+
+    #     sequence_matrix = []
+    #     init_index = vocab[' '] #TODO: Think of better batch initializations
+    #     x = np.ones((args.batch_size, 1)) * init_index
+    #     for n in xrange(seq_length):
+    #         feed = {self.input_data: x, self.initial_state: state} #TODO:  Need to change non-training behavior!
+    #         [logits, state] = sess.run([self.logits, self.final_state], feed)
+    #         logits_tf = tf.placeholder(tf.float32, [args.batch_size, args.vocab_size])
+    #         logits_feed = {logits_tf: logits}
+    #         [sample_indexes] = sess.run([self.sample_logits(logits_tf, 1.0)], logits_feed)
+    #         samples = [chars[i] for i in sample_indexes]
+    #         x = np.expand_dims(sample_indexes, 1)
+    #         sequence_matrix.append(samples)
+    #     return sequence_matrix
+
+
+    def generate_batch(self, sess, args, chars, vocab, seq_length = 200, initial = ' '):
         ''' Generate a batch of reviews entirely within TensorFlow'''
 
         state = self.cell.zero_state(args.batch_size, tf.float32).eval()
 
         sequence_matrix = []
-        init_index = vocab[' '] #TODO: Think of better batch initializations
-        x = np.ones((args.batch_size, 1)) * init_index
+        for i in xrange(args.batch_size):
+            sequence_matrix.append([])
+        char_arr = args.batch_size * [initial]
         for n in xrange(seq_length):
-            feed = {self.input_data: x, self.initial_state: state} #TODO:  Need to change non-training behavior!
-            [logits, state] = sess.run([self.logits, self.final_state], feed)
-            # l = logits[0] # Confirm this indexing
-            logits_tf = tf.placeholder(tf.float32, [args.batch_size, args.vocab_size])
-            logits_feed = {logits_tf: logits}
-            [sample_indexes] = sess.run([self.sample_logits(logits_tf)], logits_feed)
-            samples = [chars[i] for i in sample_indexes]
-            x = np.expand_dims(sample_indexes, 1)
-            sequence_matrix.append(samples)
-        return sequence_matrix
-
-
-   def generate(self, sess, chars, vocab, seq_length = 200, initial=' '):
-        state = self.cell.zero_state(1, tf.float32).eval()
-        for char in initial[:-1]:
-            x       = np.zeros((1,1))
-            x[0,0]  = vocab[char]
-            feed    = {self.input_data: x, self.initial_state: state}
-            [state] = sess.run([self.final_state], feed)
-
-        sequence = initial
-        char = initial[-1]
-        for n in xrange(seq_length):
-            x = np.zeros((1,1))
-            x[0,0] = vocab[char]
-            feed = {self.input_data: x, self.initial_state: state}
+            x = np.zeros((args.batch_size, 1))
+            for i, char in enumerate(char_arr):
+                x[i,0] = vocab[char]    
+            feed = {self.input_data: x, self.initial_state: state} 
             [probs, state] = sess.run([self.probs, self.final_state], feed)
-            p  = probs[0]
-            sample = int(np.random.choice(len(p), p=p))
-            pred = chars[sample]
-            sequence += pred
-            char = pred
-        return sequence
+            probs_tf = tf.placeholder(tf.float32, [args.batch_size, args.vocab_size])
+            probs_feed = {probs_tf: probs}
+            [sample_indexes] = sess.run([self.sample_probs(probs_tf)], probs_feed)
+            char_arr = [chars[i] for i in sample_indexes]
+            for i, char in enumerate(char_arr):
+                sequence_matrix[i].append(char)
+            # sequence_matrix.append(char_arr)
+        return sequence_matrix
