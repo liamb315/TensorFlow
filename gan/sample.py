@@ -40,4 +40,6 @@ def sample(args, num_samples = 10):
 if __name__ == '__main__':
     args = parse_args()
     with tf.device('/gpu:3'):
-        wat = sample(args)   
+        batch_samples = sample(args)   
+        print ''.join(batch_samples[0])
+    

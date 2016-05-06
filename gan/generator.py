@@ -184,5 +184,4 @@ class Generator(object):
             char_arr = [chars[i] for i in sample_indexes]
             for i, char in enumerate(char_arr):
                 sequence_matrix[i].append(char)
-            # sequence_matrix.append(char_arr)
         return sequence_matrix
