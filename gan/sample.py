@@ -25,7 +25,7 @@ def sample(args, num_samples = 10):
         saved_args = cPickle.load(f)
     with open(os.path.join(args.save_dir, 'real_beer_vocab.pkl')) as f:
         chars, vocab = cPickle.load(f)
-    generator = Generator(saved_args, is_training = False, batch=True)
+    generator = Generator(saved_args, is_training = False, batch = True)
     with tf.Session() as sess:
         tf.initialize_all_variables().run()
         saver = tf.train.Saver(tf.all_variables())
@@ -35,13 +35,17 @@ def sample(args, num_samples = 10):
             # for i in range(num_samples):
             #     print 'Review',i,':', generator.generate(sess, chars, vocab, args.n, args.prime), '\n'
 
-            return generator.generate_batch(sess, saved_args, chars, vocab)
-            
+            start = time.time()
+            print  generator.generate_batch(sess, saved_args, chars, vocab)
+            end = time.time()
+            print end - start
+
 if __name__ == '__main__':
     args = parse_args()
     with tf.device('/gpu:3'):
-        batch_samples = sample(args)   
-        print ''.join(batch_samples[0])
+        sample(args)
+        # reviews = sample(args)   
+        # for review in reviews:
+        #     print ''.join(review)
 
 
-            

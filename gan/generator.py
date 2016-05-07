@@ -143,25 +143,6 @@ class Generator(object):
         final_number = tf.argmax(tf.sub(probs, matrix_U), dimension = 1) 
         return final_number
 
-    # def generate_batch(self, sess, args, chars, vocab, seq_length = 200):
-    #     ''' Generate a batch of reviews entirely within TensorFlow'''
-
-    #     state = self.cell.zero_state(args.batch_size, tf.float32).eval()
-
-    #     sequence_matrix = []
-    #     init_index = vocab[' '] #TODO: Think of better batch initializations
-    #     x = np.ones((args.batch_size, 1)) * init_index
-    #     for n in xrange(seq_length):
-    #         feed = {self.input_data: x, self.initial_state: state} #TODO:  Need to change non-training behavior!
-    #         [logits, state] = sess.run([self.logits, self.final_state], feed)
-    #         logits_tf = tf.placeholder(tf.float32, [args.batch_size, args.vocab_size])
-    #         logits_feed = {logits_tf: logits}
-    #         [sample_indexes] = sess.run([self.sample_logits(logits_tf, 1.0)], logits_feed)
-    #         samples = [chars[i] for i in sample_indexes]
-    #         x = np.expand_dims(sample_indexes, 1)
-    #         sequence_matrix.append(samples)
-    #     return sequence_matrix
-
 
     def generate_batch(self, sess, args, chars, vocab, seq_length = 200, initial = ' '):
         ''' Generate a batch of reviews entirely within TensorFlow'''
@@ -182,8 +163,13 @@ class Generator(object):
                 x[i,0] = vocab[char]    
             feed = {self.input_data: x, self.initial_state: state} 
             [probs, state] = sess.run([self.probs, self.final_state], feed)
-            probs_feed = {probs_tf: probs}
-            [sample_indexes] = sess.run([sample_op], probs_feed)
+            # TF implementation (doesn't quite work):
+            # probs_feed = {probs_tf: probs}
+            # [sample_indexes] = sess.run([sample_op], probs_feed)
+            
+            # Numpy implementation:
+            sample_indexes = [int(np.random.choice(len(p), p=p)) for p in probs]
+            print len(sample_indexes)
             char_arr = [chars[i] for i in sample_indexes]
             for i, char in enumerate(char_arr):
                 sequence_matrix[i].append(char)
