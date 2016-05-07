@@ -19,40 +19,76 @@ class GAN(object):
 		# TODO
 		# Set all variables within cell_dis to be trainable=False
 		if args.model == 'rnn':
-			sell.cell_gen = rnn_cell.BasicRNNCell(args.rnn_size)
-			sell.cell_dis = rnn_cell.BasicRNNCell(args.rnn_size)
+			self.cell_gen = rnn_cell.BasicRNNCell(args.rnn_size)
+			self.cell_dis = rnn_cell.BasicRNNCell(args.rnn_size)
 		if args.model == 'gru':
-			sell.cell_gen = rnn_cell.GRUCell(args.rnn_size)
-			sell.cell_dis = rnn_cell.GRUCell(args.rnn_size)
+			self.cell_gen = rnn_cell.GRUCell(args.rnn_size)
+			self.cell_dis = rnn_cell.GRUCell(args.rnn_size)
 		if args.model == 'lstm':
-			sell.cell_gen = rnn_cell.BasicLSTMCell(args.rnn_size)
-			sell.cell_dis = rnn_cell.BasicLSTMCell(args.rnn_size)
+			self.cell_gen = rnn_cell.BasicLSTMCell(args.rnn_size)
+			self.cell_dis = rnn_cell.BasicLSTMCell(args.rnn_size)
 		else:
 			raise Exception('model type not supported: {}'.format(args.model))
 
-		sell.cell_gen = rnn_cell.MultiRNNCell([sell.cell_gen] * args.num_layers)
-		sell.cell_dis = rnn_cell.MultiRNNCell([sell.cell_dis] * args.num_layers)
+		self.cell_gen = rnn_cell.MultiRNNCell([self.cell_gen] * args.num_layers)
+		self.cell_dis = rnn_cell.MultiRNNCell([self.cell_dis] * args.num_layers)
 
+
+	def train_discriminator(self):
+		'''Train the discriminator classically'''
+		pass
+
+	def train_generator(self):
+		'''Train the generator via adversarial training'''
 		# TODO 
 		# Generate self.input_data to the Discriminator
-		# 1.  Figure out how to do a batch of generated reviews in TF
-		#     a. Tie in sample_distribution the generator
 		# 2.  Use this batch of generated reviews to get the probabilities
 		# 3.  Pass this as self.input_data, ensuring differentiability
 
+		# Pass the generated sequences and targets (1)
+		self.input_data  = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
+		self.targets     = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
 
-		# Pass a tensor of probabilities over the characters to the model
-		self.input_data    = tf.placeholder(tf.float32, [args.batch_size, args.seq_length, args.vocab_size])
-		self.targets       = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
-		self.initial_state = sell.cell_dis.zero_state(args.batch_size, tf.float32)
+		# Both generator and discriminator should start with 0-states
+		self.initial_state_gen = sell.cell_gen.zero_state(args.batch_size, tf.float32)
+		self.initial_state_dis = sell.cell_dis.zero_state(args.batch_size, tf.float32)
 
-		with tf.variable_scope('rnn'):
+		with tf.variable_scope('rnn_generator'):
+			softmax_w = tf.get_variable('softmax_w', [args.rnn_size, args.vocab_size])
+			softmax_b = tf.get_variable('softmax_b', [args.vocab_size])
+			
+			with tf.device('/cpu:0'):
+				embedding = tf.get_variable('embedding', [args.vocab_size, args.rnn_size])
+				inputs    = tf.split(1, args.seq_length, tf.nn.embedding_lookup(embedding, self.input_data))
+				inputs    = [tf.squeeze(i, [1]) for i in inputs]
+
+		def loop(prev, _):
+			prev = tf.nn.xw_plus_b(prev, softmax_w, softmax_b)
+			prev_symbol = tf.stop_gradient(tf.argmax(prev, 1))
+			return tf.nn.embedding_lookup(embedding, prev_symbol)
+
+		outputs, last_state = seq2seq.rnn_decoder(inputs, self.initial_state, 
+			self.cell, loop_function=None if is_training else loop, scope='rnn_generator')
+		output      = tf.reshape(tf.concat(1, outputs), [-1, args.rnn_size])
+		self.logits = tf.nn.xw_plus_b(output, softmax_w, softmax_b)
+		
+		# TODO:
+		#  Check appropriate dimensions:  
+		#  [args.batch_size, args.seq_length, args.vocab_size]
+		self.probs  = tf.nn.softmax(self.logits)
+
+		# Pass a tensor of *probabilities* over the characters to the Discriminator
+		with tf.variable_scope('rnn_discriminator'):
 			softmax_w = tf.get_variable('softmax_w', [args.rnn_size, 2], trainable = False)
 			softmax_b = tf.get_variable('softmax_b', [2], trainable = False)
 
-			embedding = tf.get_variable('embedding', [args.vocab_size, args.rnn_size])
-			inputs    = tf.split(1, args.seq_length, self.input_data)
-			inputs    = [tf.matmul(tf.squeeze(i, [1]), embedding) for i in inputs]
+			with tf.device('/cpu:0'):
+				embedding = tf.get_variable('embedding', [args.vocab_size, args.rnn_size], trainable = False)
+				
+				# TODO:
+				# Create appropriate inputs, the probability sequences from Generator
+				inputs    = tf.split(1, args.seq_length, self.input_probs)
+				inputs    = [tf.matmul(tf.squeeze(i, [1]), embedding) for i in inputs]
 
 			self.inputs = inputs
 
@@ -84,4 +120,36 @@ class GAN(object):
 			grads, _         = tf.clip_by_global_norm(tf.gradients(self.cost, tvars, aggregation_method = 2), args.grad_clip)
 			optimizer        = tf.train.AdamOptimizer(self.lr)
 			self.train_op    = optimizer.apply_gradients(zip(grads, tvars))
+
+	def generate_samples(self, sess, args, chars, vocab, seq_length = 200, initial = ' ', datafile = 'data/generated/test.txt'):
+		''' Generate a batch of reviews entirely within TensorFlow'''		
+		state = self.cell_gen.zero_state(args.batch_size, tf.float32).eval()
+
+		sequence_matrix = []
+		for i in xrange(args.batch_size):
+			sequence_matrix.append([])
+		char_arr = args.batch_size * [initial]
+		
+		probs_tf  = tf.placeholder(tf.float32, [args.batch_size, args.vocab_size])
+		sample_op = self.sample_probs(probs_tf)
+
+		for n in xrange(seq_length):
+			x = np.zeros((args.batch_size, 1))
+			for i, char in enumerate(char_arr):
+				x[i,0] = vocab[char]    
+			feed = {self.input_data: x, self.initial_state: state} 
+			[probs, state] = sess.run([self.probs, self.final_state], feed)
+			
+			# Numpy implementation:
+			sample_indexes = [int(np.random.choice(len(p), p=p)) for p in probs]
+			print len(sample_indexes)
+			char_arr = [chars[i] for i in sample_indexes]
+			for i, char in enumerate(char_arr):
+				sequence_matrix[i].append(char)
+		
+		with open(datafile, 'wb') as f:
+			for line in sequence_matrix:
+				print>>f, ''.join(line) 
+
+
 
