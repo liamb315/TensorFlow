@@ -172,15 +172,18 @@ class Generator(object):
         for i in xrange(args.batch_size):
             sequence_matrix.append([])
         char_arr = args.batch_size * [initial]
+        
+        probs_tf  = tf.placeholder(tf.float32, [args.batch_size, args.vocab_size])
+        sample_op = self.sample_probs(probs_tf)
+
         for n in xrange(seq_length):
             x = np.zeros((args.batch_size, 1))
             for i, char in enumerate(char_arr):
                 x[i,0] = vocab[char]    
             feed = {self.input_data: x, self.initial_state: state} 
             [probs, state] = sess.run([self.probs, self.final_state], feed)
-            probs_tf = tf.placeholder(tf.float32, [args.batch_size, args.vocab_size])
             probs_feed = {probs_tf: probs}
-            [sample_indexes] = sess.run([self.sample_probs(probs_tf)], probs_feed)
+            [sample_indexes] = sess.run([sample_op], probs_feed)
             char_arr = [chars[i] for i in sample_indexes]
             for i, char in enumerate(char_arr):
                 sequence_matrix[i].append(char)

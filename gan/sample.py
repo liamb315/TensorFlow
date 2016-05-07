@@ -42,3 +42,6 @@ if __name__ == '__main__':
     with tf.device('/gpu:3'):
         batch_samples = sample(args)   
         print ''.join(batch_samples[0])
+
+
+            
