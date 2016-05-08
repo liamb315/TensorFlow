@@ -33,13 +33,6 @@ class GAN(object):
 		self.cell_gen = rnn_cell.MultiRNNCell([self.cell_gen] * args.num_layers)
 		self.cell_dis = rnn_cell.MultiRNNCell([self.cell_dis] * args.num_layers)
 
-
-	def train_discriminator(self):
-		'''Train the discriminator classically'''
-		pass
-
-	def train_generator(self):
-		'''Train the generator via adversarial training'''
 		# TODO 
 		# Generate self.input_data to the Discriminator
 		# 2.  Use this batch of generated reviews to get the probabilities
@@ -50,9 +43,12 @@ class GAN(object):
 		self.targets     = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
 
 		# Both generator and discriminator should start with 0-states
-		self.initial_state_gen = sell.cell_gen.zero_state(args.batch_size, tf.float32)
-		self.initial_state_dis = sell.cell_dis.zero_state(args.batch_size, tf.float32)
+		self.initial_state_gen = self.cell_gen.zero_state(args.batch_size, tf.float32)
+		self.initial_state_dis = self.cell_dis.zero_state(args.batch_size, tf.float32)
 
+		############
+		# Generator
+		############
 		with tf.variable_scope('rnn_generator'):
 			softmax_w = tf.get_variable('softmax_w', [args.rnn_size, args.vocab_size])
 			softmax_b = tf.get_variable('softmax_b', [args.vocab_size])
@@ -67,16 +63,20 @@ class GAN(object):
 			prev_symbol = tf.stop_gradient(tf.argmax(prev, 1))
 			return tf.nn.embedding_lookup(embedding, prev_symbol)
 
-		outputs, last_state = seq2seq.rnn_decoder(inputs, self.initial_state, 
-			self.cell, loop_function=None if is_training else loop, scope='rnn_generator')
+		outputs, last_state = seq2seq.rnn_decoder(inputs, self.initial_state_gen, 
+			self.cell_gen, loop_function=None if is_training else loop, scope='rnn_generator')
 		output      = tf.reshape(tf.concat(1, outputs), [-1, args.rnn_size])
 		self.logits = tf.nn.xw_plus_b(output, softmax_w, softmax_b)
 		
 		# TODO:
 		#  Check appropriate dimensions:  
 		#  [args.batch_size, args.seq_length, args.vocab_size]
-		self.probs  = tf.nn.softmax(self.logits)
+		self.gen_probs  = tf.nn.softmax(self.logits)
+		self.gen_probs  = tf.reshape(self.gen_probs, [args.batch_size, args.seq_length, args.vocab_size])
 
+		################
+		# Discriminator
+		################
 		# Pass a tensor of *probabilities* over the characters to the Discriminator
 		with tf.variable_scope('rnn_discriminator'):
 			softmax_w = tf.get_variable('softmax_w', [args.rnn_size, 2], trainable = False)
@@ -87,18 +87,18 @@ class GAN(object):
 				
 				# TODO:
 				# Create appropriate inputs, the probability sequences from Generator
-				inputs    = tf.split(1, args.seq_length, self.input_probs)
+				inputs    = tf.split(1, args.seq_length, self.gen_probs)
 				inputs    = [tf.matmul(tf.squeeze(i, [1]), embedding) for i in inputs]
 
 			self.inputs = inputs
 
-			state   = self.initial_state
+			state   = self.initial_state_dis
 			outputs = []
 
 			for i, inp in enumerate(inputs):
 				if i > 0:
 					tf.get_variable_scope().reuse_variables()
-				output, state = sell.cell_dis(inp, state)
+				output, state = self.cell_dis(inp, state)
 				outputs.append(output)
 			last_state = state
 
@@ -121,6 +121,15 @@ class GAN(object):
 			optimizer        = tf.train.AdamOptimizer(self.lr)
 			self.train_op    = optimizer.apply_gradients(zip(grads, tvars))
 
+
+	def train_discriminator(self):
+		'''Train the discriminator classically'''
+		pass
+
+	def train_generator(self):
+		'''Train the generator via adversarial training'''
+		pass
+		
 	def generate_samples(self, sess, args, chars, vocab, seq_length = 200, initial = ' ', datafile = 'data/generated/test.txt'):
 		''' Generate a batch of reviews entirely within TensorFlow'''		
 		state = self.cell_gen.zero_state(args.batch_size, tf.float32).eval()

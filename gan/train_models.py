@@ -188,6 +188,9 @@ def train_gan(args):
 	logging.debug('Creating generator...')
 	gan = GAN(args, is_training = True)
 
+	with tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)) as sess:
+		tf.initialize_all_variables().run()
+		saver = tf.train.Saver(tf.all_variables())
 
 if __name__=='__main__':	
 	args = parse_args()
