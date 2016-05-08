@@ -23,15 +23,15 @@ def parse_args():
 		help='directory to store checkpointed generator models')
 	parser.add_argument('--save_dir_dis', type=str, default='models_discriminator',
 		help='directory to store checkpointed discriminator models')
-	parser.add_argument('--rnn_size', type=int, default=2048,
+	parser.add_argument('--rnn_size', type=int, default=128,
 		help='size of RNN hidden state')
 	parser.add_argument('--num_layers', type=int, default=2,
 		help='number of layers in the RNN')
 	parser.add_argument('--model', type=str, default='lstm',
 		help='rnn, gru, or lstm')
-	parser.add_argument('--batch_size', type=int, default=50,
+	parser.add_argument('--batch_size', type=int, default=5,
 		help='minibatch size')
-	parser.add_argument('--seq_length', type=int, default=200,
+	parser.add_argument('--seq_length', type=int, default=20,
 		help='RNN sequence length')
 	parser.add_argument('-n', type=int, default=500,
 		help='number of characters to sample')
@@ -53,11 +53,12 @@ def parse_args():
 		help='decay rate for rmsprop')
 	parser.add_argument('--keep_prob', type=float, default=0.5,
 		help='keep probability for dropout')
-	parser.add_argument('--vocab_size', type=float, default=100,
+	parser.add_argument('--vocab_size', type=float, default=10,
 		help='size of the vocabulary (characters)')
 	return parser.parse_args()
 
 args = parse_args()
+is_training = True
 
 cell_gen = rnn_cell.BasicLSTMCell(args.rnn_size)
 cell_dis = rnn_cell.BasicLSTMCell(args.rnn_size)
@@ -82,26 +83,26 @@ with tf.variable_scope('rnn_generator'):
 	
 	with tf.device('/cpu:0'):
 		embedding = tf.get_variable('embedding', [args.vocab_size, args.rnn_size])
-		inputs    = tf.split(1, args.seq_length, tf.nn.embedding_lookup(embedding, input_data))
-		inputs    = [tf.squeeze(i, [1]) for i in inputs]
+		inputs_gen    = tf.split(1, args.seq_length, tf.nn.embedding_lookup(embedding, input_data))
+		inputs_gen    = [tf.squeeze(i, [1]) for i in inputs_gen]
 
 def loop(prev, _):
 	prev = tf.nn.xw_plus_b(prev, softmax_w, softmax_b)
 	prev_symbol = tf.stop_gradient(tf.argmax(prev, 1))
 	return tf.nn.embedding_lookup(embedding, prev_symbol)
 
-outputs, last_state = seq2seq.rnn_decoder(inputs, initial_state_gen, 
+outputs, last_state = seq2seq.rnn_decoder(inputs_gen, initial_state_gen, 
 	cell_gen, loop_function=None if is_training else loop, scope='rnn_generator')
 output      = tf.reshape(tf.concat(1, outputs), [-1, args.rnn_size])
-logits = tf.nn.xw_plus_b(output, softmax_w, softmax_b)
+logits_gen = tf.nn.xw_plus_b(output, softmax_w, softmax_b)
 
 # TODO:
 #  Check appropriate dimensions:  
 #  [args.batch_size, args.seq_length, args.vocab_size]
-gen_probs  = tf.nn.softmax(logits)
+gen_probs  = tf.nn.softmax(logits_gen)
 # TODO
 # Check this reshape is being used correctly (probably is not)
-gen_probs  = tf.reshape(self.gen_probs, [args.batch_size, args.seq_length, args.vocab_size])
+gen_probs  = tf.reshape(gen_probs, [args.batch_size, args.seq_length, args.vocab_size])
 
 ################
 # Discriminator
@@ -116,13 +117,13 @@ with tf.variable_scope('rnn_discriminator'):
 		
 		# TODO:
 		# Create appropriate inputs, the probability sequences from Generator
-		inputs    = tf.split(1, args.seq_length, gen_probs)
-		inputs    = [tf.matmul(tf.squeeze(i, [1]), embedding) for i in inputs]
+		inputs_dis    = tf.split(1, args.seq_length, gen_probs)
+		inputs_dis    = [tf.matmul(tf.squeeze(i, [1]), embedding) for i in inputs_dis]
 
 state   = initial_state_dis
 outputs = []
 
-for i, inp in enumerate(inputs):
+for i, inp in enumerate(inputs_dis):
 	if i > 0:
 		tf.get_variable_scope().reuse_variables()
 	output, state = cell_dis(inp, state)

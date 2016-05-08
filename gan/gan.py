@@ -55,23 +55,25 @@ class GAN(object):
 			
 			with tf.device('/cpu:0'):
 				embedding = tf.get_variable('embedding', [args.vocab_size, args.rnn_size])
-				inputs    = tf.split(1, args.seq_length, tf.nn.embedding_lookup(embedding, self.input_data))
-				inputs    = [tf.squeeze(i, [1]) for i in inputs]
+				inputs_gen    = tf.split(1, args.seq_length, tf.nn.embedding_lookup(embedding, self.input_data))
+				inputs_gen    = [tf.squeeze(i, [1]) for i in inputs_gen]
 
 		def loop(prev, _):
 			prev = tf.nn.xw_plus_b(prev, softmax_w, softmax_b)
 			prev_symbol = tf.stop_gradient(tf.argmax(prev, 1))
 			return tf.nn.embedding_lookup(embedding, prev_symbol)
 
-		outputs, last_state = seq2seq.rnn_decoder(inputs, self.initial_state_gen, 
+		outputs, last_state = seq2seq.rnn_decoder(inputs_gen, self.initial_state_gen, 
 			self.cell_gen, loop_function=None if is_training else loop, scope='rnn_generator')
 		output      = tf.reshape(tf.concat(1, outputs), [-1, args.rnn_size])
-		self.logits = tf.nn.xw_plus_b(output, softmax_w, softmax_b)
+		self.logits_gen = tf.nn.xw_plus_b(output, softmax_w, softmax_b)
 		
 		# TODO:
 		#  Check appropriate dimensions:  
 		#  [args.batch_size, args.seq_length, args.vocab_size]
-		self.gen_probs  = tf.nn.softmax(self.logits)
+		self.gen_probs  = tf.nn.softmax(self.logits_gen)
+		# TODO
+		# Check this reshape is being used correctly (probably is not)
 		self.gen_probs  = tf.reshape(self.gen_probs, [args.batch_size, args.seq_length, args.vocab_size])
 
 		################
@@ -87,15 +89,15 @@ class GAN(object):
 				
 				# TODO:
 				# Create appropriate inputs, the probability sequences from Generator
-				inputs    = tf.split(1, args.seq_length, self.gen_probs)
-				inputs    = [tf.matmul(tf.squeeze(i, [1]), embedding) for i in inputs]
+				inputs_dis    = tf.split(1, args.seq_length, self.gen_probs)
+				inputs_dis    = [tf.matmul(tf.squeeze(i, [1]), embedding) for i in inputs_dis]
 
-			self.inputs = inputs
+			self.inputs_dis = inputs_dis
 
 			state   = self.initial_state_dis
 			outputs = []
 
-			for i, inp in enumerate(inputs):
+			for i, inp in enumerate(inputs_dis):
 				if i > 0:
 					tf.get_variable_scope().reuse_variables()
 				output, state = self.cell_dis(inp, state)
