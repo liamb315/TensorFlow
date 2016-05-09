@@ -82,26 +82,24 @@ with tf.variable_scope('rnn_generator'):
 	softmax_b = tf.get_variable('softmax_b', [args.vocab_size])
 	
 	with tf.device('/cpu:0'):
-		embedding = tf.get_variable('embedding', [args.vocab_size, args.rnn_size])
-		inputs_gen    = tf.split(1, args.seq_length, tf.nn.embedding_lookup(embedding, input_data))
-		inputs_gen    = [tf.squeeze(i, [1]) for i in inputs_gen]
+		embedding  = tf.get_variable('embedding', [args.vocab_size, args.rnn_size])
+		inputs_gen = tf.split(1, args.seq_length, tf.nn.embedding_lookup(embedding, input_data))
+		inputs_gen = [tf.squeeze(i, [1]) for i in inputs_gen]
 
 def loop(prev, _):
 	prev = tf.nn.xw_plus_b(prev, softmax_w, softmax_b)
 	prev_symbol = tf.stop_gradient(tf.argmax(prev, 1))
 	return tf.nn.embedding_lookup(embedding, prev_symbol)
 
-outputs, last_state = seq2seq.rnn_decoder(inputs_gen, initial_state_gen, 
+outputs_gen, last_state = seq2seq.rnn_decoder(inputs_gen, initial_state_gen, 
 	cell_gen, loop_function=None if is_training else loop, scope='rnn_generator')
-output      = tf.reshape(tf.concat(1, outputs), [-1, args.rnn_size])
-logits_gen = tf.nn.xw_plus_b(output, softmax_w, softmax_b)
 
-# TODO:
-#  Check appropriate dimensions:  
-#  [args.batch_size, args.seq_length, args.vocab_size]
+#  Dim: [args.batch_size * args.seq_length, args.rnn_size]
+output_gen = tf.reshape(tf.concat(1, outputs_gen), [-1, args.rnn_size])
+
+#  Dim: [args.batch_size * args.seq_length, args.vocab_size]
+logits_gen = tf.nn.xw_plus_b(output_gen, softmax_w, softmax_b)
 gen_probs  = tf.nn.softmax(logits_gen)
-# TODO
-# Check this reshape is being used correctly (probably is not)
 gen_probs  = tf.reshape(gen_probs, [args.batch_size, args.seq_length, args.vocab_size])
 
 ################
