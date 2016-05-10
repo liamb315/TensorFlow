@@ -150,39 +150,7 @@ def discriminator(input_sequence, args, reuse=False):
 			output_tf   = tf.reshape(tf.concat(1, outputs), [-1, args.rnn_size])
 			logits = tf.nn.xw_plus_b(output_tf, softmax_w, softmax_b)
 			probs  = tf.nn.softmax(logits)
-			return probs
-
-
-#####################
-# Generator Training
-#####################
-input_data    = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
-# TODO:  Rework cost
-# gen_cost      = tf.reduce_mean(tf.log(discriminator(generator(input_data, args), args)))
-gen_vars      = [v for v in tf.all_variables() if v.name.startswith("generator/")]
-# gen_optimizer = tf.train.AdamOptimizer(args.learning_rate)
-# gen_train_op  = minimize_and_clip(gen_optimizer, objective = gen_cost, var_list = gen_vars)
-
-
-#########################
-# Discriminator Training
-#########################
-# TODO:  Should this be tf.int32?
-input_real_seq  = tf.placholder(tf.float32, [args.batch_size, args.seq_length, args.vocab_size]) 
-input_gen_seq   = tf.placholder(tf.float32, [args.batch_size, args.seq_length, args.vocab_size]) 
-
-dis_real_prob   = discriminator()
-# DISCRIMIN_BATCH = 128 
-# dis_real_image = tf.placeholder(tf.float32, (DISCRIMIN_BATCH, 64, 64, 3))
-# dis_z          = tf.placeholder(tf.float32, (DISCRIMIN_BATCH, GENERATOR_SEED,))
-# dis_real_prob  = discrimin(dis_real_image, reuse=True)
-# dis_gen_prob   = discrimin(generator(dis_z, reuse=True), reuse=True)
-# dis_score      = tf.log(dis_real_prob) + tf.log(1. - dis_gen_prob)
-# dis_score      = tf.reduce_mean(dis_score)
-# dis_optimizer  = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5)
-# dis_op         = minimize_and_clip(dis_optimizer, objective=-dis_score, var_list=discrimin_vars)
-
-
+			return probs, logits
 
 def train_generator():
 	pass
@@ -199,6 +167,45 @@ if __name__ == '__main__':
 	session = tf.Session()             
 
 	args = parse_args()
+
+	#####################
+	# Generator Training
+	#####################
+	input_data    = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
+	targts        = tf.placeholder(tf.int32, [args.batch_size, args.seq_length]) # Should be 1 for real
+	gen_seq       = generator(input_data, args)
+	gen_loss      = seq2seq.sequence_loss_by_example(
+					[discriminator(gen_seq, args)[1]], # Input wants logits, not probs
+					[tf.reshape(targets, [-1])], 
+					[tf.ones([args.batch_size * args.seq_length])],
+					2)
+	gen_cost      = tf.reduce_sum(gen_loss) / args.batch_size / args.seq_length
+	gen_vars      = [v for v in tf.all_variables() if v.name.startswith("generator/")]
+	gen_optimizer = tf.train.AdamOptimizer(args.learning_rate)
+	gen_train_op  = minimize_and_clip(gen_optimizer, objective = gen_cost, var_list = gen_vars)
+
+
+	#########################
+	# Discriminator Training
+	#########################
+	# TODO:  Should this be tf.int32?
+	input_real_seq  = tf.placholder(tf.float32, [args.batch_size, args.seq_length, args.vocab_size]) 
+	input_gen_seq   = tf.placholder(tf.float32, [args.batch_size, args.seq_length, args.vocab_size]) 
+
+	dis_real_prob   = discriminator(input_real_seq, args)
+	dis_fake_prob   = discriminator(input_gen_seq, args)
+
+	# DISCRIMIN_BATCH = 128 
+	# dis_real_image = tf.placeholder(tf.float32, (DISCRIMIN_BATCH, 64, 64, 3))
+	# dis_z          = tf.placeholder(tf.float32, (DISCRIMIN_BATCH, GENERATOR_SEED,))
+	# dis_real_prob  = discrimin(dis_real_image, reuse=True)
+	# dis_gen_prob   = discrimin(generator(dis_z, reuse=True), reuse=True)
+	# dis_score      = tf.log(dis_real_prob) + tf.log(1. - dis_gen_prob)
+	# dis_score      = tf.reduce_mean(dis_score)
+	dis_vars      = [v for v in tf.all_variables() if v.name.startswith("discriminator/")]
+	dis_optimizer  = tf.train.AdamOptimizer(args.learning_rate_dis)
+	# dis_op         = minimize_and_clip(dis_optimizer, objective=-dis_score, var_list=discrimin_vars)
+
 
 	try:
 		generator(args)
