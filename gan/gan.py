@@ -127,7 +127,7 @@ class GAN(object):
 		pass
 		
 	def generate_samples(self, sess, args, chars, vocab, seq_length = 200, initial = ' ', datafile = 'data/generated/test.txt'):
-		''' Generate a batch of reviews entirely within TensorFlow'''		
+		''' Generate a batch of reviews'''		
 		state = self.cell_gen.zero_state(args.batch_size, tf.float32).eval()
 
 		sequence_matrix = []
