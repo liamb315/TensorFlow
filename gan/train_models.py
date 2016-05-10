@@ -3,7 +3,7 @@ import numpy as np
 import logging
 from tensorflow.models.rnn import *
 from argparse import ArgumentParser
-from batcher import Batcher, DiscriminatorBatcher
+from batcher import Batcher, DiscriminatorBatcher, GANBatcher
 from generator import Generator
 from discriminator import Discriminator
 from gan import GAN
@@ -23,6 +23,8 @@ def parse_args():
 		help='directory to store checkpointed generator models')
 	parser.add_argument('--save_dir_dis', type=str, default='models_discriminator',
 		help='directory to store checkpointed discriminator models')
+	parser.add_argument('--save_dir_GAN', type=str, default='models_GAN',
+		help='directory to store checkpointed GAN models')
 	parser.add_argument('--rnn_size', type=int, default=2048,
 		help='size of RNN hidden state')
 	parser.add_argument('--num_layers', type=int, default=2,
@@ -39,6 +41,8 @@ def parse_args():
 		help='prime text')
 	parser.add_argument('--num_epochs', type=int, default=5,
 		help='number of epochs')
+	parser.add_argument('--num_epochs_GAN', type=int, default=5,
+		help='number of epochs to train GAN')
 	parser.add_argument('--num_epochs_dis', type=int, default=5,
 		help='number of epochs to train discriminator')
 	parser.add_argument('--save_every', type=int, default=50,
@@ -92,7 +96,8 @@ def train_generator(args, load_recent=True):
 				start = time.time()
 				x, y  = batcher.next_batch()
 				feed  = {generator.input_data: x, generator.targets: y, generator.initial_state: state}
-				train_loss, state, _ = sess.run([generator.cost, generator.final_state, generator.train_op], feed)
+				# train_loss, state, _ = sess.run([generator.cost, generator.final_state, generator.train_op], feed)
+				train_loss, _ = sess.run([generator.cost, generator.train_op], feed)
 				end   = time.time()
 				
 				print '{}/{} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}' \
@@ -177,13 +182,15 @@ def train_discriminator(args, load_recent_weights = 'Generator'):
 def train_gan(args):
 	'''Adversarial Training'''
 	logging.debug('Batcher...')
-	# batcher   = GANBatcher(args.data_dir, args.batch_size, args.seq_length)
+	# TODO
+	# Write a proper batcher for GAN
+	batcher  = GANBatcher(args.data_dir, args.batch_size, args.seq_length)
 
 	logging.debug('Vocabulary...')
-	# with open(os.path.join(args.save_dir_gen, 'config.pkl'), 'w') as f:
-	# 	cPickle.dump(args, f)
-	# with open(os.path.join(args.save_dir_gen, 'real_beer_vocab.pkl'), 'w') as f:
-	# 	cPickle.dump((batcher.chars, batcher.vocab), f)
+	with open(os.path.join(args.save_dir_GAN, 'config.pkl'), 'w') as f:
+		cPickle.dump(args, f)
+	with open(os.path.join(args.save_dir_GAN, 'simple_vocab.pkl'), 'w') as f:
+		cPickle.dump((batcher.chars, batcher.vocab), f)
 
 	logging.debug('Creating generator...')
 	gan = GAN(args, is_training = True)
@@ -191,6 +198,40 @@ def train_gan(args):
 	with tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)) as sess:
 		tf.initialize_all_variables().run()
 		saver = tf.train.Saver(tf.all_variables())
+
+		ckpt = tf.train.get_checkpoint_state(args.save_dir_GAN)
+		if ckpt and ckpt.model_checkpoint_path:
+			saver.restore(sess, ckpt.model_checkpoint_path)
+
+		for epoch in xrange(args.num_epochs_GAN):
+			# Anneal learning rate
+			new_lr = args.learning_rate * (args.decay_rate ** epoch)
+			sess.run(tf.assign(gan.lr, new_lr))
+			batcher.reset_batch_pointer()
+			state_gen = gan.initial_state_gen.eval()
+			state_dis = gan.initial_state_dis.eval()
+
+			for batch in xrange(batcher.num_batches):
+				start = time.time()
+				x, _  = batcher.next_batch()
+				y     = np.ones(x.shape)
+				feed  = {gan.input_data: x, 
+						gan.targets: y, 
+						gan.initial_state_gen: state_gen, 
+						gan.initial_state_dis: state_dis}
+				train_loss, _ = sess.run([gan.cost, gan.train_op], feed)
+				end   = time.time()
+
+				print '{}/{} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}' \
+					.format(epoch * batcher.num_batches + batch,
+						args.num_epochs * batcher.num_batches,
+						epoch, train_loss, end - start)
+				
+				if (epoch * batcher.num_batches + batch) % args.save_every == 0:
+					checkpoint_path = os.path.join(args.save_dir_GAN, 'model.ckpt')
+					saver.save(sess, checkpoint_path, global_step = epoch * batcher.num_batches + batch)
+					print 'GAN model saved to {}'.format(checkpoint_path)
+
 
 if __name__=='__main__':	
 	args = parse_args()
@@ -207,7 +248,3 @@ if __name__=='__main__':
 	
 	# generate_sample(args)
 
-
-
-
-	# #sess.close()

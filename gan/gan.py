@@ -58,7 +58,7 @@ class GAN(object):
 			prev_symbol = tf.stop_gradient(tf.argmax(prev, 1))
 			return tf.nn.embedding_lookup(embedding, prev_symbol)
 
-		outputs_gen, last_state = seq2seq.rnn_decoder(inputs_gen, self.initial_state_gen, 
+		outputs_gen, last_state_gen = seq2seq.rnn_decoder(inputs_gen, self.initial_state_gen, 
 			self.cell_gen, loop_function=None if is_training else loop, scope='rnn_generator')
 		
 		#  Dim: [args.batch_size * args.seq_length, args.rnn_size]
@@ -76,24 +76,24 @@ class GAN(object):
 		################
 		# Pass a tensor of *probabilities* over the characters to the Discriminator
 		with tf.variable_scope('rnn_discriminator'):
-			softmax_w = tf.get_variable('softmax_w', [args.rnn_size, 2], trainable = False)
-			softmax_b = tf.get_variable('softmax_b', [2], trainable = False)
+			softmax_w = tf.stop_gradient(tf.get_variable('softmax_w', [args.rnn_size, 2]))
+			softmax_b = tf.stop_gradient(tf.get_variable('softmax_b', [2]))
 
 			with tf.device('/cpu:0'):
-				embedding  = tf.get_variable('embedding', [args.vocab_size, args.rnn_size], trainable = False)
+				embedding  = tf.stop_gradient(tf.get_variable('embedding', [args.vocab_size, args.rnn_size]))
 				inputs_dis = tf.split(1, args.seq_length, self.probs_gen)
 				inputs_dis = [tf.matmul(tf.squeeze(i, [1]), embedding) for i in inputs_dis]
 
 			self.inputs_dis = inputs_dis
-			state   = self.initial_state_dis
+			state_dis   = self.initial_state_dis
 			outputs_dis = []
 
 			for i, inp in enumerate(inputs_dis):
 				if i > 0:
 					tf.get_variable_scope().reuse_variables()
-				output_dis, state = self.cell_dis(inp, state)
+				output_dis, state_dis = self.cell_dis(inp, state_dis)
 				outputs_dis.append(output_dis)
-			last_state = state
+			last_state_dis = state_dis
 
 			output_tf   = tf.reshape(tf.concat(1, outputs_dis), [-1, args.rnn_size])
 			self.logits = tf.nn.xw_plus_b(output_tf, softmax_w, softmax_b)
@@ -107,8 +107,11 @@ class GAN(object):
 
 			self.cost = tf.reduce_sum(loss) / args.batch_size / args.seq_length
 
-			self.final_state = last_state
+			self.final_state_gen = last_state_gen
+			self.final_state_dis = last_state_dis
 			self.lr          = tf.Variable(0.0, trainable = False)
+			# TODO:
+			# Correct trainable variables for the model
 			tvars 	         = tf.trainable_variables()
 			grads, _         = tf.clip_by_global_norm(tf.gradients(self.cost, tvars, aggregation_method = 2), args.grad_clip)
 			optimizer        = tf.train.AdamOptimizer(self.lr)
