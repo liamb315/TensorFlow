@@ -25,7 +25,7 @@ def parse_args():
 		help='directory to store checkpointed discriminator models')
 	parser.add_argument('--save_dir_GAN', type=str, default='models_GAN',
 		help='directory to store checkpointed GAN models')
-	parser.add_argument('--rnn_size', type=int, default=2048,
+	parser.add_argument('--rnn_size', type=int, default=128,
 		help='size of RNN hidden state')
 	parser.add_argument('--num_layers', type=int, default=2,
 		help='number of layers in the RNN')
@@ -206,7 +206,7 @@ def train_gan(args):
 		for epoch in xrange(args.num_epochs_GAN):
 			# Anneal learning rate
 			new_lr = args.learning_rate * (args.decay_rate ** epoch)
-			sess.run(tf.assign(gan.lr, new_lr))
+			sess.run(tf.assign(gan.lr_gen, new_lr))
 			batcher.reset_batch_pointer()
 			state_gen = gan.initial_state_gen.eval()
 			state_dis = gan.initial_state_dis.eval()
@@ -219,13 +219,13 @@ def train_gan(args):
 						gan.targets: y, 
 						gan.initial_state_gen: state_gen, 
 						gan.initial_state_dis: state_dis}
-				train_loss, _ = sess.run([gan.cost, gan.train_op], feed)
+				gen_train_loss, _ = sess.run([gan.cost, gan.gen_train_op], feed)
 				end   = time.time()
 
 				print '{}/{} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}' \
 					.format(epoch * batcher.num_batches + batch,
 						args.num_epochs * batcher.num_batches,
-						epoch, train_loss, end - start)
+						epoch, gen_train_loss, end - start)
 				
 				if (epoch * batcher.num_batches + batch) % args.save_every == 0:
 					checkpoint_path = os.path.join(args.save_dir_GAN, 'model.ckpt')

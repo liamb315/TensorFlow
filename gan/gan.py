@@ -101,6 +101,9 @@ class GAN(object):
 				self.logits = tf.nn.xw_plus_b(output_tf, softmax_w, softmax_b)
 				self.probs  = tf.nn.softmax(self.logits)
 
+			self.final_state_dis = last_state_dis
+
+
 		loss = seq2seq.sequence_loss_by_example(
 			[self.logits],
 			[tf.reshape(self.targets, [-1])], 
@@ -109,22 +112,26 @@ class GAN(object):
 
 		self.cost = tf.reduce_sum(loss) / args.batch_size / args.seq_length
 
-		self.final_state_dis = last_state_dis
-		self.lr              = tf.Variable(0.0, trainable = False)
-		tvars 	      = tf.trainable_variables()
-		gen_vars      = [v for v in tvars if v.name.startswith("generator/")]
-		grads, _      = tf.clip_by_global_norm(tf.gradients(self.cost, gen_vars, aggregation_method = 2), args.grad_clip)
-		optimizer     = tf.train.AdamOptimizer(self.lr)
-		self.train_op = optimizer.apply_gradients(zip(grads, tvars))
+		self.lr_gen = tf.Variable(0.0, trainable = False)
+		self.lr_dis = tf.Variable(0.0, trainable = False)
+		
+		self.tvars 	= tf.trainable_variables()
+		gen_vars             = [v for v in self.tvars if v.name.startswith("generator/")]
+		gen_grads, _         = tf.clip_by_global_norm(tf.gradients(self.cost, gen_vars, aggregation_method = 2), self.args.grad_clip)
+		gen_optimizer        = tf.train.AdamOptimizer(self.lr_gen)
+		self.gen_train_op    = gen_optimizer.apply_gradients(zip(gen_grads, gen_vars))
 
 
 	def train_discriminator(self):
 		'''Train the discriminator classically'''
-		pass
+		dis_vars             = [v for v in self.tvars if v.name.startswith("discriminator/")]
+		#TODO:  Return the dis_train_op?
 
 	def train_generator(self):
 		'''Train the generator via adversarial training'''
-		pass
+		# TODO:  Return the gen_train_op?
+		pass				
+
 
 	def generate_samples(self, sess, args, chars, vocab, seq_length = 200, initial = ' ', datafile = 'data/generated/GAN.txt'):
 		''' Generate a batch of reviews'''		
