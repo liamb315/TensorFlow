@@ -30,92 +30,95 @@ class GAN(object):
 		else:
 			raise Exception('model type not supported: {}'.format(args.model))
 
-		self.cell_gen = rnn_cell.MultiRNNCell([self.cell_gen] * args.num_layers)
-		self.cell_dis = rnn_cell.MultiRNNCell([self.cell_dis] * args.num_layers)
+		with tf.variable_scope('generator'):
+			self.cell_gen = rnn_cell.MultiRNNCell([self.cell_gen] * args.num_layers)
+		with tf.variable_scope('discriminator'):
+			self.cell_dis = rnn_cell.MultiRNNCell([self.cell_dis] * args.num_layers)
 
 		# Pass the generated sequences and targets (1)
 		self.input_data  = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
 		self.targets     = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
 
-		# Both generator and discriminator should start with 0-states
-		self.initial_state_gen = self.cell_gen.zero_state(args.batch_size, tf.float32)
-		self.initial_state_dis = self.cell_dis.zero_state(args.batch_size, tf.float32)
-
 		############
 		# Generator
 		############
-		with tf.variable_scope('rnn_generator'):
-			softmax_w = tf.get_variable('softmax_w', [args.rnn_size, args.vocab_size])
-			softmax_b = tf.get_variable('softmax_b', [args.vocab_size])
+		with tf.variable_scope('generator'):
+			self.initial_state_gen = self.cell_gen.zero_state(args.batch_size, tf.float32)	
+
+			with tf.variable_scope('rnn'):
+				softmax_w = tf.get_variable('softmax_w', [args.rnn_size, args.vocab_size])
+				softmax_b = tf.get_variable('softmax_b', [args.vocab_size])
+				
+				with tf.device('/cpu:0'):
+					embedding  = tf.get_variable('embedding', [args.vocab_size, args.rnn_size])
+					inputs_gen = tf.split(1, args.seq_length, tf.nn.embedding_lookup(embedding, self.input_data))
+					inputs_gen = [tf.squeeze(i, [1]) for i in inputs_gen]
+
+			def loop(prev, _):
+				prev = tf.nn.xw_plus_b(prev, softmax_w, softmax_b)
+				prev_symbol = tf.stop_gradient(tf.argmax(prev, 1))
+				return tf.nn.embedding_lookup(embedding, prev_symbol)
+
+			outputs_gen, last_state_gen = seq2seq.rnn_decoder(inputs_gen, self.initial_state_gen, 
+				self.cell_gen, loop_function=None if is_training else loop, scope='rnn')
 			
-			with tf.device('/cpu:0'):
-				embedding  = tf.get_variable('embedding', [args.vocab_size, args.rnn_size])
-				inputs_gen = tf.split(1, args.seq_length, tf.nn.embedding_lookup(embedding, self.input_data))
-				inputs_gen = [tf.squeeze(i, [1]) for i in inputs_gen]
+			#  Dim: [args.batch_size * args.seq_length, args.rnn_size]
+			output_gen      = tf.reshape(tf.concat(1, outputs_gen), [-1, args.rnn_size])
 
-		def loop(prev, _):
-			prev = tf.nn.xw_plus_b(prev, softmax_w, softmax_b)
-			prev_symbol = tf.stop_gradient(tf.argmax(prev, 1))
-			return tf.nn.embedding_lookup(embedding, prev_symbol)
+			#  Dim: [args.batch_size * args.seq_length, args.vocab_size]
+			self.logits_gen = tf.nn.xw_plus_b(output_gen, softmax_w, softmax_b)
+			self.probs_gen  = tf.nn.softmax(self.logits_gen)
 
-		outputs_gen, last_state_gen = seq2seq.rnn_decoder(inputs_gen, self.initial_state_gen, 
-			self.cell_gen, loop_function=None if is_training else loop, scope='rnn_generator')
-		
-		#  Dim: [args.batch_size * args.seq_length, args.rnn_size]
-		output_gen      = tf.reshape(tf.concat(1, outputs_gen), [-1, args.rnn_size])
-
-		#  Dim: [args.batch_size * args.seq_length, args.vocab_size]
-		self.logits_gen = tf.nn.xw_plus_b(output_gen, softmax_w, softmax_b)
-		self.probs_gen  = tf.nn.softmax(self.logits_gen)
-
-		# Dim:  [args.batch_size, args.seq_length, args.vocab_size]
-		self.probs_gen  = tf.reshape(self.probs_gen, [args.batch_size, args.seq_length, args.vocab_size])
+			# Dim:  [args.batch_size, args.seq_length, args.vocab_size]
+			self.probs_gen  = tf.reshape(self.probs_gen, [args.batch_size, args.seq_length, args.vocab_size])
 
 		################
 		# Discriminator
 		################
 		# Pass a tensor of *probabilities* over the characters to the Discriminator
-		with tf.variable_scope('rnn_discriminator'):
-			softmax_w = tf.stop_gradient(tf.get_variable('softmax_w', [args.rnn_size, 2]))
-			softmax_b = tf.stop_gradient(tf.get_variable('softmax_b', [2]))
+		with tf.variable_scope('discriminator'):
+			self.initial_state_dis = self.cell_dis.zero_state(args.batch_size, tf.float32)
 
-			with tf.device('/cpu:0'):
-				embedding  = tf.stop_gradient(tf.get_variable('embedding', [args.vocab_size, args.rnn_size]))
-				inputs_dis = tf.split(1, args.seq_length, self.probs_gen)
-				inputs_dis = [tf.matmul(tf.squeeze(i, [1]), embedding) for i in inputs_dis]
+			with tf.variable_scope('rnn'):
+				softmax_w = tf.stop_gradient(tf.get_variable('softmax_w', [args.rnn_size, 2]))
+				softmax_b = tf.stop_gradient(tf.get_variable('softmax_b', [2]))
 
-			self.inputs_dis = inputs_dis
-			state_dis   = self.initial_state_dis
-			outputs_dis = []
+				with tf.device('/cpu:0'):
+					embedding  = tf.stop_gradient(tf.get_variable('embedding', [args.vocab_size, args.rnn_size]))
+					inputs_dis = tf.split(1, args.seq_length, self.probs_gen)
+					inputs_dis = [tf.matmul(tf.squeeze(i, [1]), embedding) for i in inputs_dis]
 
-			for i, inp in enumerate(inputs_dis):
-				if i > 0:
-					tf.get_variable_scope().reuse_variables()
-				output_dis, state_dis = self.cell_dis(inp, state_dis)
-				outputs_dis.append(output_dis)
-			last_state_dis = state_dis
+				self.inputs_dis = inputs_dis
+				state_dis   = self.initial_state_dis
+				outputs_dis = []
 
-			output_tf   = tf.reshape(tf.concat(1, outputs_dis), [-1, args.rnn_size])
-			self.logits = tf.nn.xw_plus_b(output_tf, softmax_w, softmax_b)
-			self.probs  = tf.nn.softmax(self.logits)
+				for i, inp in enumerate(inputs_dis):
+					if i > 0:
+						tf.get_variable_scope().reuse_variables()
+					output_dis, state_dis = self.cell_dis(inp, state_dis)
+					outputs_dis.append(output_dis)
+				last_state_dis = state_dis
 
-			loss = seq2seq.sequence_loss_by_example(
-				[self.logits],
-				[tf.reshape(self.targets, [-1])], 
-				[tf.ones([args.batch_size * args.seq_length])],
-				2)
+				output_tf   = tf.reshape(tf.concat(1, outputs_dis), [-1, args.rnn_size])
+				self.logits = tf.nn.xw_plus_b(output_tf, softmax_w, softmax_b)
+				self.probs  = tf.nn.softmax(self.logits)
 
-			self.cost = tf.reduce_sum(loss) / args.batch_size / args.seq_length
+		loss = seq2seq.sequence_loss_by_example(
+			[self.logits],
+			[tf.reshape(self.targets, [-1])], 
+			[tf.ones([args.batch_size * args.seq_length])],
+			2)
 
-			self.final_state_gen = last_state_gen
-			self.final_state_dis = last_state_dis
-			self.lr          = tf.Variable(0.0, trainable = False)
-			# TODO:
-			# Correct trainable variables for the model
-			tvars 	         = tf.trainable_variables()
-			grads, _         = tf.clip_by_global_norm(tf.gradients(self.cost, tvars, aggregation_method = 2), args.grad_clip)
-			optimizer        = tf.train.AdamOptimizer(self.lr)
-			self.train_op    = optimizer.apply_gradients(zip(grads, tvars))
+		self.cost = tf.reduce_sum(loss) / args.batch_size / args.seq_length
+
+		self.final_state_gen = last_state_gen
+		self.final_state_dis = last_state_dis
+		self.lr              = tf.Variable(0.0, trainable = False)
+		tvars 	      = tf.trainable_variables()
+		gen_vars      = [v for v in tvars if v.name.startswith("generator/")]
+		grads, _      = tf.clip_by_global_norm(tf.gradients(self.cost, gen_vars, aggregation_method = 2), args.grad_clip)
+		optimizer     = tf.train.AdamOptimizer(self.lr)
+		self.train_op = optimizer.apply_gradients(zip(grads, tvars))
 
 
 	def train_discriminator(self):

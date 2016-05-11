@@ -14,37 +14,29 @@ def parse_args():
 	parser = ArgumentParser()
 	parser.add_argument('--data_dir', type=str, default='data',
 		help='data directory containing reviews')
-	parser.add_argument('--save_dir_gen', type=str, default='models_generator',
-		help='directory to store checkpointed generator models')
-	parser.add_argument('--save_dir_dis', type=str, default='models_discriminator',
-		help='directory to store checkpointed discriminator models')
 	parser.add_argument('--save_dir_GAN', type=str, default='models_GAN',
 		help='directory to store checkpointed GAN models')
-	parser.add_argument('--rnn_size', type=int, default=2048,
+	parser.add_argument('--rnn_size', type=int, default=128,
 		help='size of RNN hidden state')
 	parser.add_argument('--num_layers', type=int, default=2,
 		help='number of layers in the RNN')
 	parser.add_argument('--model', type=str, default='lstm',
 		help='rnn, gru, or lstm')
-	parser.add_argument('--batch_size', type=int, default=50,
+	parser.add_argument('--batch_size', type=int, default=5,
 		help='minibatch size')
-	parser.add_argument('--seq_length', type=int, default=200,
+	parser.add_argument('--seq_length', type=int, default=20,
 		help='RNN sequence length')
 	parser.add_argument('-n', type=int, default=500,
 		help='number of characters to sample')
 	parser.add_argument('--prime', type=str, default=' ',
 		help='prime text')
-	parser.add_argument('--num_epochs', type=int, default=5,
-		help='number of epochs')
 	parser.add_argument('--num_epochs_GAN', type=int, default=5,
 		help='number of epochs to train GAN')
-	parser.add_argument('--num_epochs_dis', type=int, default=5,
-		help='number of epochs to train discriminator')
 	parser.add_argument('--save_every', type=int, default=50,
 		help='save frequency')
 	parser.add_argument('--grad_clip', type=float, default=5.,
 		help='clip gradients at this value')
-	parser.add_argument('--learning_rate', type=float, default=0.002,
+	parser.add_argument('--learning_rate_gen', type=float, default=0.002,
 		help='learning rate')
 	parser.add_argument('--learning_rate_dis', type=float, default=0.0002,
 		help='learning rate for discriminator')
@@ -65,12 +57,12 @@ def minimize_and_clip(optimizer, objective, var_list, clip_val=5):
 	return optimizer.apply_gradients(gradients)
 
 
-def generator(input_data, reuse=False):
+def generator(input_data, args, reuse=False):
 	'''
 	Produce a probability sequence from the provided input_sequence
 
 	args:
-		input_data:  
+		input_data:   
 		args:  
 
 	returns:
@@ -104,7 +96,7 @@ def generator(input_data, reuse=False):
 			return tf.nn.embedding_lookup(embedding, prev_symbol)
 
 		outputs, last_state = seq2seq.rnn_decoder(inputs, initial_state, cell, 
-				loop_function=None if is_training else loop, scope='generator/rnn')
+				loop_function=None if is_training else loop, scope='rnn')
 		
 		#  Dim: [args.batch_size * args.seq_length, args.rnn_size]
 		output = tf.reshape(tf.concat(1, outputs), [-1, args.rnn_size])
@@ -159,18 +151,14 @@ def train_discriminator():
 	pass
 
 
-
 if __name__ == '__main__':
 	ops.reset_default_graph()       
 	if 'session' in globals():         
 		session.close()                
 	session = tf.Session()             
-
 	args = parse_args()
 
-	#####################
 	# Generator Training
-	#####################
 	input_data    = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
 	targts        = tf.placeholder(tf.int32, [args.batch_size, args.seq_length]) # Should be 1 for real
 	gen_seq       = generator(input_data, args)
@@ -181,13 +169,11 @@ if __name__ == '__main__':
 					2)
 	gen_cost      = tf.reduce_sum(gen_loss) / args.batch_size / args.seq_length
 	gen_vars      = [v for v in tf.all_variables() if v.name.startswith("generator/")]
-	gen_optimizer = tf.train.AdamOptimizer(args.learning_rate)
+	gen_optimizer = tf.train.AdamOptimizer(args.learning_rate_gen)
 	gen_train_op  = minimize_and_clip(gen_optimizer, objective = gen_cost, var_list = gen_vars)
 
 
-	#########################
 	# Discriminator Training
-	#########################
 	# TODO:  Should this be tf.int32?
 	input_real_seq  = tf.placholder(tf.float32, [args.batch_size, args.seq_length, args.vocab_size]) 
 	input_gen_seq   = tf.placholder(tf.float32, [args.batch_size, args.seq_length, args.vocab_size]) 
@@ -208,7 +194,6 @@ if __name__ == '__main__':
 
 
 	try:
-		generator(args)
 		print generator_vars
 		# for epoch in range(START_EPOCH, 10):
 		#     for next_idx, batch in batched_images(START_IDX):
