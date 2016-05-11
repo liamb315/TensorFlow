@@ -13,11 +13,8 @@ class GAN(object):
 		self.args = args
 
 		if not is_training:
-			args.batch_size = 1
 			args.seq_length = 1
 
-		# TODO
-		# Set all variables within cell_dis to be trainable=False
 		if args.model == 'rnn':
 			self.cell_gen = rnn_cell.BasicRNNCell(args.rnn_size)
 			self.cell_dis = rnn_cell.BasicRNNCell(args.rnn_size)
@@ -66,11 +63,12 @@ class GAN(object):
 			output_gen      = tf.reshape(tf.concat(1, outputs_gen), [-1, args.rnn_size])
 
 			#  Dim: [args.batch_size * args.seq_length, args.vocab_size]
-			self.logits_gen = tf.nn.xw_plus_b(output_gen, softmax_w, softmax_b)
-			self.probs_gen  = tf.nn.softmax(self.logits_gen)
+			self.logits_gen         = tf.nn.xw_plus_b(output_gen, softmax_w, softmax_b)
+			self.probs_gen_grouped  = tf.nn.softmax(self.logits_gen)
 
 			# Dim:  [args.batch_size, args.seq_length, args.vocab_size]
-			self.probs_gen  = tf.reshape(self.probs_gen, [args.batch_size, args.seq_length, args.vocab_size])
+			self.probs_gen       = tf.reshape(self.probs_gen_grouped, [args.batch_size, args.seq_length, args.vocab_size])
+			self.final_state_gen = last_state_gen
 
 		################
 		# Discriminator
@@ -111,7 +109,6 @@ class GAN(object):
 
 		self.cost = tf.reduce_sum(loss) / args.batch_size / args.seq_length
 
-		self.final_state_gen = last_state_gen
 		self.final_state_dis = last_state_dis
 		self.lr              = tf.Variable(0.0, trainable = False)
 		tvars 	      = tf.trainable_variables()
@@ -128,8 +125,8 @@ class GAN(object):
 	def train_generator(self):
 		'''Train the generator via adversarial training'''
 		pass
-		
-	def generate_samples(self, sess, args, chars, vocab, seq_length = 200, initial = ' ', datafile = 'data/generated/test.txt'):
+
+	def generate_samples(self, sess, args, chars, vocab, seq_length = 200, initial = ' ', datafile = 'data/generated/GAN.txt'):
 		''' Generate a batch of reviews'''		
 		state = self.cell_gen.zero_state(args.batch_size, tf.float32).eval()
 
@@ -138,26 +135,25 @@ class GAN(object):
 			sequence_matrix.append([])
 		char_arr = args.batch_size * [initial]
 		
-		probs_tf  = tf.placeholder(tf.float32, [args.batch_size, args.vocab_size])
-		sample_op = self.sample_probs(probs_tf)
-
 		for n in xrange(seq_length):
 			x = np.zeros((args.batch_size, 1))
 			for i, char in enumerate(char_arr):
 				x[i,0] = vocab[char]    
-			feed = {self.input_data: x, self.initial_state: state} 
-			[probs, state] = sess.run([self.probs, self.final_state], feed)
-			
-			# Numpy implementation:
+			feed = {self.input_data: x, self.initial_state_gen: state} 
+			[probs, state] = sess.run([self.probs_gen_grouped, self.final_state_gen], feed)
 			sample_indexes = [int(np.random.choice(len(p), p=p)) for p in probs]
-			print len(sample_indexes)
+			print 'chars', chars
+			print 'sample_index', sample_indexes
 			char_arr = [chars[i] for i in sample_indexes]
 			for i, char in enumerate(char_arr):
 				sequence_matrix[i].append(char)
 		
 		with open(datafile, 'wb') as f:
 			for line in sequence_matrix:
+				print ''.join(line)
 				print>>f, ''.join(line) 
+
+		return sequence_matrix
 
 
 

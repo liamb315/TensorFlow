@@ -154,8 +154,9 @@ class Generator(object):
             sequence_matrix.append([])
         char_arr = args.batch_size * [initial]
         
-        probs_tf  = tf.placeholder(tf.float32, [args.batch_size, args.vocab_size])
-        sample_op = self.sample_probs(probs_tf)
+        # TF implementation (doesn't quite work):
+        # probs_tf  = tf.placeholder(tf.float32, [args.batch_size, args.vocab_size])
+        # sample_op = self.sample_probs(probs_tf)
 
         for n in xrange(seq_length):
             x = np.zeros((args.batch_size, 1))

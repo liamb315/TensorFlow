@@ -57,7 +57,7 @@ def parse_args():
 		help='decay rate for rmsprop')
 	parser.add_argument('--keep_prob', type=float, default=0.5,
 		help='keep probability for dropout')
-	parser.add_argument('--vocab_size', type=float, default=100,
+	parser.add_argument('--vocab_size', type=float, default=5,
 		help='size of the vocabulary (characters)')
 	return parser.parse_args()
 
