@@ -78,11 +78,11 @@ class GAN(object):
 			self.initial_state_dis = self.cell_dis.zero_state(args.batch_size, tf.float32)
 
 			with tf.variable_scope('rnn'):
-				softmax_w = tf.stop_gradient(tf.get_variable('softmax_w', [args.rnn_size, 2]))
-				softmax_b = tf.stop_gradient(tf.get_variable('softmax_b', [2]))
+				softmax_w = tf.get_variable('softmax_w', [args.rnn_size, 2])
+				softmax_b = tf.get_variable('softmax_b', [2])
 
 				with tf.device('/cpu:0'):
-					embedding  = tf.stop_gradient(tf.get_variable('embedding', [args.vocab_size, args.rnn_size]))
+					embedding  = tf.get_variable('embedding', [args.vocab_size, args.rnn_size])
 					inputs_dis = tf.split(1, args.seq_length, self.probs_gen)
 					inputs_dis = [tf.matmul(tf.squeeze(i, [1]), embedding) for i in inputs_dis]
 
@@ -103,37 +103,33 @@ class GAN(object):
 
 			self.final_state_dis = last_state_dis
 
-
-		loss = seq2seq.sequence_loss_by_example(
+		gen_loss = seq2seq.sequence_loss_by_example(
 			[self.logits],
 			[tf.reshape(self.targets, [-1])], 
 			[tf.ones([args.batch_size * args.seq_length])],
 			2)
 
-		self.cost = tf.reduce_sum(loss) / args.batch_size / args.seq_length
+		self.gen_cost = tf.reduce_sum(gen_loss) / args.batch_size / args.seq_length
 
-		self.lr_gen = tf.Variable(0.0, trainable = False)
-		self.lr_dis = tf.Variable(0.0, trainable = False)
-		
+		self.lr_gen = tf.Variable(0.0, trainable = False)		
 		self.tvars 	= tf.trainable_variables()
-		gen_vars             = [v for v in self.tvars if v.name.startswith("generator/")]
-		gen_grads, _         = tf.clip_by_global_norm(tf.gradients(self.cost, gen_vars, aggregation_method = 2), self.args.grad_clip)
+	
+		# Train Generator		
+		gen_vars             = [v for v in self.tvars if v.name.startswith("gan/generator/")]
+		gen_grads, _         = tf.clip_by_global_norm(tf.gradients(self.gen_cost, gen_vars, aggregation_method = 2), self.args.grad_clip)
 		gen_optimizer        = tf.train.AdamOptimizer(self.lr_gen)
-		self.gen_train_op    = gen_optimizer.apply_gradients(zip(gen_grads, gen_vars))
+		self.gen_train_op    = gen_optimizer.apply_gradients(zip(gen_grads, gen_vars))				
 
 
 	def train_discriminator(self):
 		'''Train the discriminator classically'''
-		dis_vars             = [v for v in self.tvars if v.name.startswith("discriminator/")]
-		#TODO:  Return the dis_train_op?
+		pass
 
-	def train_generator(self):
+	def train_generator(self, *args):
 		'''Train the generator via adversarial training'''
-		# TODO:  Return the gen_train_op?
-		pass				
-
-
-	def generate_samples(self, sess, args, chars, vocab, seq_length = 200, initial = ' ', datafile = 'data/generated/GAN.txt'):
+		pass
+		
+	def generate_samples(self, sess, args, chars, vocab, seq_length = 200, initial = ' ', datafile = 'data/gan/fake_reviews.txt'):
 		''' Generate a batch of reviews'''		
 		state = self.cell_gen.zero_state(args.batch_size, tf.float32).eval()
 
@@ -149,8 +145,6 @@ class GAN(object):
 			feed = {self.input_data: x, self.initial_state_gen: state} 
 			[probs, state] = sess.run([self.probs_gen_grouped, self.final_state_gen], feed)
 			sample_indexes = [int(np.random.choice(len(p), p=p)) for p in probs]
-			print 'chars', chars
-			print 'sample_index', sample_indexes
 			char_arr = [chars[i] for i in sample_indexes]
 			for i, char in enumerate(char_arr):
 				sequence_matrix[i].append(char)
@@ -161,6 +155,3 @@ class GAN(object):
 				print>>f, ''.join(line) 
 
 		return sequence_matrix
-
-
-
