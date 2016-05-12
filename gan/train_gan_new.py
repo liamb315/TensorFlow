@@ -68,7 +68,9 @@ def train_generator(gan, args, sess):
 	logging.debug('Training generator...')
 	
 	# TODO:  Write a proper batcher for GAN
-	batcher  = GANBatcher(args.real_input_file, args.vocab_file, args.data_dir, args.batch_size, args.seq_length)
+	batcher  = GANBatcher(args.real_input_file, args.vocab_file, 
+						  args.data_dir, args.batch_size, 
+						  args.seq_length)
 
 	# TODO:  
 	#  if starting:  Load model from memory if original
@@ -115,11 +117,14 @@ def train_generator(gan, args, sess):
 def train_discriminator(discriminator, args, sess):
 	'''Train the discriminator via classical approach'''
 	logging.debug('Training discriminator...')
-	batcher  = DiscriminatorBatcher(args.real_input_file, args.fake_input_file, args.batch_size, args.seq_length)
+	batcher  = DiscriminatorBatcher(args.real_input_file, 
+									args.fake_input_file, 
+									args.data_dir, args.vocab_file,
+									args.batch_size, args.seq_length)
 
 	# TODO:  Load discriminative parameters from GAN
-	# dis_vars = 
-	# dis_saver = 
+	# dis_vars = [v for v in t.all_variables() if v.name.startswith('gan/discriminator')]
+	# dis_saver = tf.train.Saver(gan_vars)
 	
 	for epoch in xrange(args.num_epochs_dis):
 		# Anneal learning rate
@@ -143,31 +148,37 @@ def train_discriminator(discriminator, args, sess):
 			
 			print '{}/{} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}' \
 				.format(epoch * batcher.num_batches + batch,
-					args.num_epochs * batcher.num_batches,
+					args.num_epochs_dis * batcher.num_batches,
 					epoch, train_loss, end - start)
 			
-
-
-
-def generate_samples(generator, args, sess):
+			
+def generate_samples(generator, args, sess, num_samples=100):
 	'''Generate samples from the current version of the GAN'''
-	# TOOD:  Load generative parameters from GAN
-	# gen_vars = 
-	# gen_saver = 
+	with open(os.path.join(args.save_dir_GAN, 'config.pkl')) as f:
+		saved_args = cPickle.load(f)
+	with open(args.vocab_file) as f:
+		chars, vocab = cPickle.load(f)
+	# A `dict` of names to variables: The keys are the names that will be
+	# used to save or restore the variables in the checkpoint files.
+	gen_vars = [v for v in tf.all_variables() if v.name.startswith('gan/')]
+	gen_dict = {}
+	for v in gen_vars:
+		gen_dict[v.op.name.replace('gan','generator')] = v
+	gen_saver = tf.train.Saver(gen_dict)
+	ckpt =  tr.train.get_checkpoint_state(args.save_dir_GAN)
+	ckpt = tf.train.get_checkpoint_state(args.save_dir_GAN)
+	if ckpt and ckpt.model_checkpoint_path:
+		gen_saver.restore(sess, ckpt.model_checkpoint_path)
+		return generator.generate_samples(sess, saved_args, chars, vocab, args.n)
+
+
+def adversarial_training(args, sess):
+	'''Adversarial Training'''
+	# for epoch in xrange(args.num_epochs_GAN):
+		# 1.  train_generator(args, sess)
+		# 2.  generate_new_dataset =
+		# 3.  train_discriminator(args, sess)
 	pass
-
-
-# def train_gan_new(args, sess):
-# 	'''Adversarial Training, but better!'''
-
-
-# 	for epoch in xrange(args.num_epochs_GAN):
-# 		# 1.  train_generator(args, sess)
-
-# 		# 2.  generate_new_dataset =
-
-# 		# 3.  train_discriminator(args, sess)
-
 
 
 
@@ -181,10 +192,12 @@ if __name__=='__main__':
 				gan = GAN(args, is_training = True)
 			with tf.variable_scope('discriminator'):
 				discriminator = Discriminator(args, is_training = True)
-			# generator     = Generator    (args, is_training = False)
+			with tf.variable_scope('generator'):
+				generator = GAN(args, is_training = False)
 
+			logging.debug('Initializing variables in graph...')
 			tf.initialize_all_variables().run()
 
-			train_generator(gan, args, sess)
-			# saver = tf.train.Saver(tf.all_variables())
+			# train_generator(gan, args, sess)
+			train_discriminator(discriminator, args, sess)
 
