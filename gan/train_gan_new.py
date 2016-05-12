@@ -70,6 +70,10 @@ def train_generator(gan, args, sess):
 	# TODO:  Write a proper batcher for GAN
 	batcher  = GANBatcher(args.real_input_file, args.vocab_file, args.data_dir, args.batch_size, args.seq_length)
 
+	# TODO:  
+	#  if starting:  Load model from memory if original
+	#  else:  Load discriminative weights from discriminator
+
 	gan_vars = [v for v in tf.all_variables() if v.name.startswith('gan/')]
 	gan_saver = tf.train.Saver(gan_vars)
 
@@ -108,43 +112,49 @@ def train_generator(gan, args, sess):
 
 
 
-# def train_discriminator(discriminator, args, sess):
-# 	'''Train the discriminator via classical approach'''
-# 	logging.debug('Batcher...')
-# 	batcher  = DiscriminatorBatcher(args.real_input_file, args.fake_input_file, args.batch_size, args.seq_length)
+def train_discriminator(discriminator, args, sess):
+	'''Train the discriminator via classical approach'''
+	logging.debug('Training discriminator...')
+	batcher  = DiscriminatorBatcher(args.real_input_file, args.fake_input_file, args.batch_size, args.seq_length)
 
+	# TODO:  Load discriminative parameters from GAN
+	# dis_vars = 
+	# dis_saver = 
 	
-		
-# 	for epoch in xrange(args.num_epochs_dis):
-# 		# Anneal learning rate
-# 		new_lr = args.learning_rate_dis * (args.decay_rate ** epoch)
-# 		sess.run(tf.assign(discriminator.lr, new_lr))
-# 		batcher.reset_batch_pointer()
-# 		state = discriminator.initial_state.eval()
+	for epoch in xrange(args.num_epochs_dis):
+		# Anneal learning rate
+		new_lr = args.learning_rate_dis * (args.decay_rate ** epoch)
+		sess.run(tf.assign(discriminator.lr, new_lr))
+		batcher.reset_batch_pointer()
+		state = discriminator.initial_state.eval()
 
-# 		for batch in xrange(batcher.num_batches):
-# 			start = time.time()
-# 			x, y  = batcher.next_batch()
+		for batch in xrange(batcher.num_batches):
+			start = time.time()
+			x, y  = batcher.next_batch()
 
-# 			feed  = {discriminator.input_data: x, 
-# 					 discriminator.targets: y, 
-# 					 discriminator.initial_state: state}
-# 			train_loss, state, _ = sess.run([discriminator.cost,
-# 											discriminator.final_state,
-# 											discriminator.train_op], 
-# 											feed)
-# 			end   = time.time()
+			feed  = {discriminator.input_data: x, 
+					 discriminator.targets: y, 
+					 discriminator.initial_state: state}
+			train_loss, state, _ = sess.run([discriminator.cost,
+											discriminator.final_state,
+											discriminator.train_op], 
+											feed)
+			end   = time.time()
 			
-# 			print '{}/{} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}' \
-# 				.format(epoch * batcher.num_batches + batch,
-# 					args.num_epochs * batcher.num_batches,
-# 					epoch, train_loss, end - start)
+			print '{}/{} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}' \
+				.format(epoch * batcher.num_batches + batch,
+					args.num_epochs * batcher.num_batches,
+					epoch, train_loss, end - start)
 			
-# 			if (epoch * batcher.num_batches + batch) % args.save_every == 0:
-# 				checkpoint_path = os.path.join(args.save_dir_dis, 'discriminator.ckpt')
-# 				saver.save(sess, checkpoint_path, global_step = epoch * batcher.num_batches + batch)
-# 				print 'Discriminator model saved to {}'.format(checkpoint_path)
 
+
+
+def generate_samples(generator, args, sess):
+	'''Generate samples from the current version of the GAN'''
+	# TOOD:  Load generative parameters from GAN
+	# gen_vars = 
+	# gen_saver = 
+	pass
 
 
 # def train_gan_new(args, sess):
@@ -169,7 +179,8 @@ if __name__=='__main__':
 			logging.debug('Creating models...')
 			with tf.variable_scope('gan'):
 				gan = GAN(args, is_training = True)
-			# discriminator = Discriminator(args, is_training = True)
+			with tf.variable_scope('discriminator'):
+				discriminator = Discriminator(args, is_training = True)
 			# generator     = Generator    (args, is_training = False)
 
 			tf.initialize_all_variables().run()

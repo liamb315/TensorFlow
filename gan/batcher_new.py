@@ -10,12 +10,12 @@ logger.setLevel(logging.DEBUG)
 
 
 class DiscriminatorBatcher(object):
-	def __init__(self, real_file, fake_file, vocab_file, batch_size, seq_length):
+	def __init__(self, real_file, fake_file, data_dir, vocab_file, batch_size, seq_length):
 		self.batch_size = batch_size
 		self.seq_length = seq_length
 
-		real_tensor  = os.path.join(data_dir, 'real_beer_data_v0.1.npy')
-		fake_tensor  = os.path.join(data_dir, 'fake_beer_data_v0.1.npy')
+		real_tensor  = os.path.join(data_dir, 'real_data.npy')
+		fake_tensor  = os.path.join(data_dir, 'fake_data.npy')
 
 		if not (os.path.exists(vocab_file) and os.path.exists(real_tensor) and os.path.exists(fake_tensor)):
 			self.preprocess(real_file, fake_file, vocab_file, real_tensor, fake_tensor)

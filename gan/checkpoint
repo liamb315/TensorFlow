@@ -1,2 +1,0 @@
-model_checkpoint_path: "/home/ubuntu/gan/model.ckpt"
-all_model_checkpoint_paths: "/home/ubuntu/gan/model.ckpt"
