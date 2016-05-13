@@ -10,10 +10,11 @@ from tensorflow.python.framework import ops
 
 class GAN(object):
 	def __init__(self, args, is_training=True):
-		self.args = args
 
 		if not is_training:
-			args.seq_length = 1
+			seq_length = 1
+		else:
+			seq_length = args.seq_length
 
 		if args.model == 'rnn':
 			self.cell_gen = rnn_cell.BasicRNNCell(args.rnn_size)
@@ -33,8 +34,8 @@ class GAN(object):
 			self.cell_dis = rnn_cell.MultiRNNCell([self.cell_dis] * args.num_layers)
 
 		# Pass the generated sequences and targets (1)
-		self.input_data  = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
-		self.targets     = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
+		self.input_data  = tf.placeholder(tf.int32, [args.batch_size, seq_length])
+		self.targets     = tf.placeholder(tf.int32, [args.batch_size, seq_length])
 
 		############
 		# Generator
@@ -48,7 +49,7 @@ class GAN(object):
 				
 				with tf.device('/cpu:0'):
 					embedding  = tf.get_variable('embedding', [args.vocab_size, args.rnn_size])
-					inputs_gen = tf.split(1, args.seq_length, tf.nn.embedding_lookup(embedding, self.input_data))
+					inputs_gen = tf.split(1, seq_length, tf.nn.embedding_lookup(embedding, self.input_data))
 					inputs_gen = [tf.squeeze(i, [1]) for i in inputs_gen]
 
 			def loop(prev, _):
@@ -59,15 +60,15 @@ class GAN(object):
 			outputs_gen, last_state_gen = seq2seq.rnn_decoder(inputs_gen, self.initial_state_gen, 
 				self.cell_gen, loop_function=None if is_training else loop, scope='rnn')
 			
-			#  Dim: [args.batch_size * args.seq_length, args.rnn_size]
+			#  Dim: [args.batch_size * seq_length, args.rnn_size]
 			output_gen      = tf.reshape(tf.concat(1, outputs_gen), [-1, args.rnn_size])
 
-			#  Dim: [args.batch_size * args.seq_length, args.vocab_size]
+			#  Dim: [args.batch_size * seq_length, args.vocab_size]
 			self.logits_gen         = tf.nn.xw_plus_b(output_gen, softmax_w, softmax_b)
 			self.probs_gen_grouped  = tf.nn.softmax(self.logits_gen)
 
-			# Dim:  [args.batch_size, args.seq_length, args.vocab_size]
-			self.probs_gen       = tf.reshape(self.probs_gen_grouped, [args.batch_size, args.seq_length, args.vocab_size])
+			# Dim:  [args.batch_size, seq_length, args.vocab_size]
+			self.probs_gen       = tf.reshape(self.probs_gen_grouped, [args.batch_size, seq_length, args.vocab_size])
 			self.final_state_gen = last_state_gen
 
 		################
@@ -83,7 +84,7 @@ class GAN(object):
 
 				with tf.device('/cpu:0'):
 					embedding  = tf.get_variable('embedding', [args.vocab_size, args.rnn_size])
-					inputs_dis = tf.split(1, args.seq_length, self.probs_gen)
+					inputs_dis = tf.split(1, seq_length, self.probs_gen)
 					inputs_dis = [tf.matmul(tf.squeeze(i, [1]), embedding) for i in inputs_dis]
 
 				self.inputs_dis = inputs_dis
@@ -104,10 +105,10 @@ class GAN(object):
 		gen_loss = seq2seq.sequence_loss_by_example(
 			[self.logits],
 			[tf.reshape(self.targets, [-1])], 
-			[tf.ones([args.batch_size * args.seq_length])],
+			[tf.ones([args.batch_size * seq_length])],
 			2)
 
-		self.gen_cost = tf.reduce_sum(gen_loss) / args.batch_size / args.seq_length
+		self.gen_cost = tf.reduce_sum(gen_loss) / args.batch_size / seq_length
 
 		self.final_state_dis = last_state_dis
 		self.lr_gen = tf.Variable(0.0, trainable = False)		
@@ -115,7 +116,7 @@ class GAN(object):
 		if is_training:
 			self.tvars 	= tf.trainable_variables()
 			gen_vars             = [v for v in self.tvars if v.name.startswith("generator/")]
-			gen_grads, _         = tf.clip_by_global_norm(tf.gradients(self.gen_cost, gen_vars, aggregation_method = 2), self.args.grad_clip)
+			gen_grads, _         = tf.clip_by_global_norm(tf.gradients(self.gen_cost, gen_vars, aggregation_method = 2), args.grad_clip)
 			gen_optimizer        = tf.train.AdamOptimizer(self.lr_gen)
 			self.gen_train_op    = gen_optimizer.apply_gradients(zip(gen_grads, gen_vars))				
 

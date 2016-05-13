@@ -16,7 +16,7 @@ logger.setLevel(logging.INFO)
 
 def parse_args():
 	parser = ArgumentParser()
-	parser.add_argument('--real_input_file', type=str, default='simple_reviews.txt',
+	parser.add_argument('--real_input_file', type=str, default='real_reviews.txt',
 		help='real reviews')
 	parser.add_argument('--fake_input_file', type=str, default='fake_reviews.txt',
 		help='fake reviews')
@@ -129,15 +129,13 @@ def train_generator(gan, args, sess, initial_load = True):
 def train_discriminator(discriminator, args, sess):
 	'''Train the discriminator via classical approach'''
 	logging.debug('Training discriminator...')
+	
 	batcher  = DiscriminatorBatcher(args.real_input_file, 
 									args.fake_input_file, 
 									args.data_dir, args.vocab_file,
 									args.batch_size, args.seq_length)
 
 	logging.debug('Vocabulary...')
-	# TODO:  What is this doing?
-	# with open(os.path.join(args.save_dir_dis, 'config.pkl'), 'w') as f:
-	# 	cPickle.dump(args, f)
 	with open(os.path.join(args.save_dir_GAN, 'simple_vocab.pkl'), 'w') as f:
 		cPickle.dump((batcher.chars, batcher.vocab), f)
 
@@ -221,6 +219,7 @@ def adversarial_training(args, sess):
 
 if __name__=='__main__':
 	args = parse_args()
+
 	with tf.device('/gpu:3'):
 		with tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)) as sess:
 
