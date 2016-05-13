@@ -42,13 +42,13 @@ def parse_args():
 		help='number of characters to sample')
 	parser.add_argument('--prime', type=str, default=' ',
 		help='prime text')
-	parser.add_argument('--num_epochs_GAN', type=int, default=1,
+	parser.add_argument('--num_epochs_GAN', type=int, default=5,
 		help='number of epochs of GAN')
-	parser.add_argument('--num_epochs_gen', type=int, default=5,
+	parser.add_argument('--num_epochs_gen', type=int, default=1,
 		help='number of epochs to train generator')
-	parser.add_argument('--num_epochs_dis', type=int, default=5,
+	parser.add_argument('--num_epochs_dis', type=int, default=1,
 		help='number of epochs to train discriminator')
-	parser.add_argument('--save_every', type=int, default=50,
+	parser.add_argument('--save_every', type=int, default=5,
 		help='save frequency')
 	parser.add_argument('--grad_clip', type=float, default=5.,
 		help='clip gradients at this value')
@@ -107,7 +107,8 @@ def train_generator(gan, args, sess, initial_load = True):
 		state_gen = gan.initial_state_gen.eval()
 		state_dis = gan.initial_state_dis.eval()
 
-		for batch in xrange(batcher.num_batches):
+		for batch in xrange(10):
+		# for batch in xrange(batcher.num_batches):
 			start = time.time()
 			x, _  = batcher.next_batch()
 			y     = np.ones(x.shape)
@@ -164,7 +165,8 @@ def train_discriminator(discriminator, args, sess):
 		batcher.reset_batch_pointer()
 		state = discriminator.initial_state.eval()
 
-		for batch in xrange(batcher.num_batches):
+		for batch in xrange(10):
+		# for batch in xrange(batcher.num_batches):
 			start = time.time()
 			x, y  = batcher.next_batch()
 
@@ -210,13 +212,16 @@ def generate_samples(generator, args, sess, num_samples=1000):
 	return generator.generate_samples(sess, saved_args, chars, vocab, args.n)
 
 
-def adversarial_training(args, sess):
+def adversarial_training(gan, discriminator, generator, args, sess):
 	'''Adversarial Training'''
-	# for epoch in xrange(args.num_epochs_GAN):
-		# 1.  train_generator(args, sess)
-		# 2.  generate_new_dataset =
-		# 3.  train_discriminator(args, sess)
-	pass
+	train_generator(gan, args, sess, initial_load = True)
+	generate_samples(generator, args, sess)
+
+	for epoch in xrange(args.num_epochs_GAN):
+		train_discriminator(discriminator, args, sess)
+		train_generator(gan, args, sess, initial_load = False)
+		generate_samples(generator, args, sess)
+	return
 
 
 if __name__=='__main__':
@@ -235,8 +240,4 @@ if __name__=='__main__':
 			logging.debug('Initializing variables in graph...')
 			tf.initialize_all_variables().run()
 
-
-			# train_generator(gan, args, sess, initial_load = True)
-			# generate_samples(generator, args, sess, 10)
-			# train_discriminator(discriminator, args, sess)
-			train_generator(gan, args, sess, initial_load = False)
+			adversarial_training(gan, discriminator, generator, args, sess)
