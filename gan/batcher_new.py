@@ -102,6 +102,8 @@ class GANBatcher(object):
 		self.batch_size = batch_size
 		self.seq_length = seq_length
 
+		input_file  = os.path.join(data_dir, input_file)		
+		vocab_file  = os.path.join(data_dir, vocab_file)
 		tensor_file = os.path.join(data_dir, 'simple_data.npy')
 
 		if not (os.path.exists(vocab_file) and os.path.exists(tensor_file)):

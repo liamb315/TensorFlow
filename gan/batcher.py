@@ -164,7 +164,7 @@ class GANBatcher(object):
 		self.batch_size = batch_size
 		self.seq_length = seq_length
 
-		input_file  = os.path.join(data_dir, 'simple_data.txt')
+		input_file  = os.path.join(data_dir, 'simple_reviews.txt')
 		vocab_file  = os.path.join(data_dir, 'simple_vocab.pkl')
 		tensor_file = os.path.join(data_dir, 'simple_data.npy')
 

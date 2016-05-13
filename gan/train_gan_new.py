@@ -16,13 +16,13 @@ logger.setLevel(logging.INFO)
 
 def parse_args():
 	parser = ArgumentParser()
-	parser.add_argument('--real_input_file', type=str, default='data/gan/simple_reviews.txt',
+	parser.add_argument('--real_input_file', type=str, default='simple_reviews.txt',
 		help='real reviews')
-	parser.add_argument('--fake_input_file', type=str, default='data/gan/fake_reviews.txt',
+	parser.add_argument('--fake_input_file', type=str, default='fake_reviews.txt',
 		help='fake reviews')
 	parser.add_argument('--data_dir', type=str, default='data/gan',
 		help='data directory containing reviews')
-	parser.add_argument('--vocab_file', type=str, default='vocab/simple_vocab.pkl',
+	parser.add_argument('--vocab_file', type=str, default='simple_vocab.pkl',
 		help='data directory containing reviews')
 	parser.add_argument('--save_dir_GAN', type=str, default='models_GAN',
 		help='directory to store checkpointed GAN models')
@@ -72,14 +72,23 @@ def train_generator(gan, args, sess, initial_load = True):
 						  args.data_dir, args.batch_size, 
 						  args.seq_length)
 
+	logging.debug('Vocabulary...')
+	with open(os.path.join(args.save_dir_GAN, 'config.pkl'), 'w') as f:
+		cPickle.dump(args, f)
+	with open(os.path.join(args.save_dir_GAN, 'simple_vocab.pkl'), 'w') as f:
+		cPickle.dump((batcher.chars, batcher.vocab), f)
+
+	# Load GAN parameters from file to begin
 	if initial_load:
 		logging.debug('Load GAN parameters from checkpoint only...')
-		gan_vars = [v for v in tf.all_variables() if not (v.name.startswith('classic/' or v.name.startswith('sampler/'))]
+		gan_vars = [v for v in tf.all_variables() if not 
+					(v.name.startswith('classic/') or v.name.startswith('sampler/') )]
 		gan_saver = tf.train.Saver(gan_vars)
 
 		ckpt = tf.train.get_checkpoint_state(args.save_dir_GAN)
 		if ckpt and ckpt.model_checkpoint_path:
 			gan_saver.restore(sess, ckpt.model_checkpoint_path)
+	# Update Discriminator parameters as the model proceeds
 	# else:
 	# 	logging.debug('Update GAN parameters from Discriminator...')
 	# 	dis_vars = [v for v in tf.all_variables() if v.name.startswith('classic/')]
@@ -173,7 +182,7 @@ def generate_samples(generator, args, sess, num_samples=100):
 	gen_vars = [v for v in tf.all_variables() if v.name.startswith('generator/')]
 	gen_dict = {}
 	for v in gen_vars:
-		gen_dict['sampler/' + v.op.name)] = v
+		gen_dict['sampler/' + v.op.name] = v
 	gen_saver = tf.train.Saver(gen_dict)
 	ckpt =  tf.train.get_checkpoint_state(args.save_dir_GAN)
 	ckpt = tf.train.get_checkpoint_state(args.save_dir_GAN)
@@ -200,10 +209,10 @@ if __name__=='__main__':
 
 			logging.debug('Creating models...')
 			gan = GAN(args, is_training = True)
-			with tf.variable_scope('classic'):
-				discriminator = Discriminator(args, is_training = True)
-			with tf.variable_scope('sampler'):
-				generator = GAN(args, is_training = False)
+			# with tf.variable_scope('classic'):
+			# 	discriminator = Discriminator(args, is_training = True)
+			# with tf.variable_scope('sampler'):
+			# 	generator = GAN(args, is_training = False)
 
 			logging.debug('Initializing variables in graph...')
 			tf.initialize_all_variables().run()

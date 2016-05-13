@@ -16,7 +16,7 @@ logger.setLevel(logging.INFO)
 
 def parse_args():
 	parser = ArgumentParser()
-	parser.add_argument('--data_dir', type=str, default='data',
+	parser.add_argument('--data_dir', type=str, default='data/gan',
 		help='data directory containing reviews')
 	parser.add_argument('--save_dir_GAN', type=str, default='models_GAN',
 		help='directory to store checkpointed GAN models')
@@ -73,7 +73,7 @@ def train_gan(args):
 		cPickle.dump((batcher.chars, batcher.vocab), f)
 
 	logging.debug('Creating generator...')
-	gan           = GAN(args, is_training = True)
+	gan = GAN(args, is_training = True)
 	 
 	with tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)) as sess:
 		tf.initialize_all_variables().run()
