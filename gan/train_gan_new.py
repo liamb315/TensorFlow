@@ -89,12 +89,11 @@ def train_generator(gan, args, sess, initial_load = True):
 		if ckpt and ckpt.model_checkpoint_path:
 			gan_saver.restore(sess, ckpt.model_checkpoint_path)
 	
-	# Update Discriminator parameters as the model proceeds
+	# TODO: Update Discriminator parameters as the model proceeds
 	# else:
 	# 	logging.debug('Update GAN parameters from Discriminator...')
 	# 	dis_vars = [v for v in tf.all_variables() if v.name.startswith('classic/')]
 	# 	dis_saver = tf.train.Saver(dis_vars)
-
 
 	for epoch in xrange(args.num_epochs_gen):
 		# Anneal learning rate
@@ -135,11 +134,21 @@ def train_discriminator(discriminator, args, sess):
 									args.data_dir, args.vocab_file,
 									args.batch_size, args.seq_length)
 
+	logging.debug('Vocabulary...')
+	# TODO:  What is this doing?
+	# with open(os.path.join(args.save_dir_dis, 'config.pkl'), 'w') as f:
+	# 	cPickle.dump(args, f)
+	with open(os.path.join(args.save_dir_GAN, 'simple_vocab.pkl'), 'w') as f:
+		cPickle.dump((batcher.chars, batcher.vocab), f)
+
 	logging.debug('Loading GAN parameters to Discriminator...')
-	dis_vars = [v for v in t.all_variables() if v.name.startswith('discriminator')]
+	# TODO:  Only using the trainable variables, is this OK?
+	dis_vars = [v for v in tf.trainable_variables() if v.name.startswith('classic/')]
 	dis_dict = {}
 	for v in dis_vars:
-		dis_dict['classic/'+v.op.name] = v #backwards?
+		# Key:    op.name in GAN Checkpoint file
+		# Value:  Local generator Variable 
+		dis_dict[v.op.name.replace('classic/','discriminator/')] = v
 	dis_saver = tf.train.Saver(dis_dict)
 
 	ckpt = tf.train.get_checkpoint_state(args.save_dir_GAN)
@@ -171,6 +180,12 @@ def train_discriminator(discriminator, args, sess):
 					args.num_epochs_dis * batcher.num_batches,
 					epoch, train_loss, end - start)
 			
+			# TODO:  Save Discriminator parameters to be read out later
+			# if (epoch * batcher.num_batches + batch) % args.save_every == 0:
+			# 	checkpoint_path = os.path.join(args.save_dir_GAN, 'model.ckpt')
+			# 	gan_saver.save(sess, checkpoint_path, global_step = epoch * batcher.num_batches + batch)
+			# 	print 'Discriminator model saved to {}'.format(checkpoint_path)
+
 			
 def generate_samples(generator, args, sess, num_samples=100):
 	'''Generate samples from the current version of the GAN'''
@@ -220,6 +235,6 @@ if __name__=='__main__':
 			tf.initialize_all_variables().run()
 
 			# train_generator(gan, args, sess, initial_load = True)
-			reviews = generate_samples(generator, args, sess, 10)
-			# train_discriminator(discriminator, args, sess)
+			# generate_samples(generator, args, sess, 10)
+			train_discriminator(discriminator, args, sess)
 

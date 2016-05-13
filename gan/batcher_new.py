@@ -14,8 +14,11 @@ class DiscriminatorBatcher(object):
 		self.batch_size = batch_size
 		self.seq_length = seq_length
 
+		real_file    = os.path.join(data_dir, real_file)
+		fake_file    = os.path.join(data_dir, fake_file)
 		real_tensor  = os.path.join(data_dir, 'real_data.npy')
 		fake_tensor  = os.path.join(data_dir, 'fake_data.npy')
+		vocab_fiel   = os.path.join(data_dir, vocab_file)
 
 		if not (os.path.exists(vocab_file) and os.path.exists(real_tensor) and os.path.exists(fake_tensor)):
 			self.preprocess(real_file, fake_file, vocab_file, real_tensor, fake_tensor)

@@ -119,14 +119,6 @@ class GAN(object):
 			gen_optimizer        = tf.train.AdamOptimizer(self.lr_gen)
 			self.gen_train_op    = gen_optimizer.apply_gradients(zip(gen_grads, gen_vars))				
 
-
-	def train_discriminator(self):
-		'''Train the discriminator classically'''
-		pass
-
-	def train_generator(self, *args):
-		'''Train the generator via adversarial training'''
-		pass
 		
 	def generate_samples(self, sess, args, chars, vocab, seq_length = 200, initial = ' ', datafile = 'data/gan/fake_reviews.txt'):
 		''' Generate a batch of reviews'''		
