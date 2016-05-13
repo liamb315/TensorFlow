@@ -26,6 +26,8 @@ def parse_args():
 		help='data directory containing reviews')
 	parser.add_argument('--save_dir_GAN', type=str, default='models_GAN',
 		help='directory to store checkpointed GAN models')
+	parser.add_argument('--save_dir_dis', type=str, default='models_GAN/discriminator',
+		help='directory to store checkpointed discriminator models')
 	parser.add_argument('--rnn_size', type=int, default=128,
 		help='size of RNN hidden state')
 	parser.add_argument('--num_layers', type=int, default=2,
@@ -67,7 +69,6 @@ def train_generator(gan, args, sess, initial_load = True):
 	'''Train Generator via GAN'''
 	logging.debug('Training generator...')
 	
-	# TODO:  Write a proper batcher for GAN
 	batcher  = GANBatcher(args.real_input_file, args.vocab_file, 
 						  args.data_dir, args.batch_size, 
 						  args.seq_length)
@@ -78,25 +79,28 @@ def train_generator(gan, args, sess, initial_load = True):
 	with open(os.path.join(args.save_dir_GAN, 'simple_vocab.pkl'), 'w') as f:
 		cPickle.dump((batcher.chars, batcher.vocab), f)
 
-	# Load GAN parameters from file to begin
-	if initial_load:
-		logging.debug('Load GAN parameters from checkpoint only...')
-		gan_vars = [v for v in tf.all_variables() if not 
+	# Save all GAN variables to gan_saver
+	gan_vars = [v for v in tf.all_variables() if not 
 					(v.name.startswith('classic/') or v.name.startswith('sampler/') )]
-		gan_saver = tf.train.Saver(gan_vars)
+	gan_saver = tf.train.Saver(gan_vars)
 
+	# Retrieve trainable Discriminator variables from dis_saver
+	dis_vars = [v for v in tf.trainable_variables() if v.name.startswith('discriminator/')]
+	dis_saver = tf.train.Saver(dis_vars)
+
+	if initial_load:
+		logging.debug('Initla load of GAN parameters...')
 		ckpt = tf.train.get_checkpoint_state(args.save_dir_GAN)
 		if ckpt and ckpt.model_checkpoint_path:
 			gan_saver.restore(sess, ckpt.model_checkpoint_path)
 	
-	# TODO: Update Discriminator parameters as the model proceeds
-	# else:
-	# 	logging.debug('Update GAN parameters from Discriminator...')
-	# 	dis_vars = [v for v in tf.all_variables() if v.name.startswith('classic/')]
-	# 	dis_saver = tf.train.Saver(dis_vars)
+	else:
+		logging.debug('Update GAN parameters from Discriminator...')		
+		ckpt = tf.train.get_checkpoint_state(args.save_dir_dis)
+		if ckpt and ckpt.model_checkpoint_path:
+			dis_saver.restore(sess, ckpt.model_checkpoint_path)
 
 	for epoch in xrange(args.num_epochs_gen):
-		# Anneal learning rate
 		new_lr = args.learning_rate_gen * (args.decay_rate ** epoch)
 		sess.run(tf.assign(gan.lr_gen, new_lr))
 		batcher.reset_batch_pointer()
@@ -178,14 +182,13 @@ def train_discriminator(discriminator, args, sess):
 					args.num_epochs_dis * batcher.num_batches,
 					epoch, train_loss, end - start)
 			
-			# TODO:  Save Discriminator parameters to be read out later
-			# if (epoch * batcher.num_batches + batch) % args.save_every == 0:
-			# 	checkpoint_path = os.path.join(args.save_dir_GAN, 'model.ckpt')
-			# 	gan_saver.save(sess, checkpoint_path, global_step = epoch * batcher.num_batches + batch)
-			# 	print 'Discriminator model saved to {}'.format(checkpoint_path)
+			if (epoch * batcher.num_batches + batch) % args.save_every == 0:
+				checkpoint_path = os.path.join(args.save_dir_dis, 'model.ckpt')
+				dis_saver.save(sess, checkpoint_path, global_step = epoch * batcher.num_batches + batch)
+				print 'Discriminator model saved to {}'.format(checkpoint_path)
 
 			
-def generate_samples(generator, args, sess, num_samples=100):
+def generate_samples(generator, args, sess, num_samples=1000):
 	'''Generate samples from the current version of the GAN'''
 	with open(os.path.join(args.save_dir_GAN, 'config.pkl')) as f:
 		saved_args = cPickle.load(f)
@@ -201,7 +204,6 @@ def generate_samples(generator, args, sess, num_samples=100):
 		gen_dict[v.op.name.replace('sampler/','')] = v
 	gen_saver = tf.train.Saver(gen_dict)
 	ckpt = tf.train.get_checkpoint_state(args.save_dir_GAN)
-	
 	if ckpt and ckpt.model_checkpoint_path:
 		gen_saver.restore(sess, ckpt.model_checkpoint_path)
 	
@@ -233,7 +235,8 @@ if __name__=='__main__':
 			logging.debug('Initializing variables in graph...')
 			tf.initialize_all_variables().run()
 
+
 			# train_generator(gan, args, sess, initial_load = True)
 			# generate_samples(generator, args, sess, 10)
-			train_discriminator(discriminator, args, sess)
-
+			# train_discriminator(discriminator, args, sess)
+			train_generator(gan, args, sess, initial_load = False)
