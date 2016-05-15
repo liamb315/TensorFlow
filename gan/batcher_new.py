@@ -20,10 +20,12 @@ class DiscriminatorBatcher(object):
 		fake_tensor  = os.path.join(data_dir, 'fake_data.npy')
 		vocab_fiel   = os.path.join(data_dir, vocab_file)
 
-		if not (os.path.exists(vocab_file) and os.path.exists(real_tensor) and os.path.exists(fake_tensor)):
-			self.preprocess(real_file, fake_file, vocab_file, real_tensor, fake_tensor)
-		else:
-			self.load_preprocessed(vocab_file, real_tensor, fake_tensor)
+		# if not (os.path.exists(vocab_file) and os.path.exists(real_tensor) and os.path.exists(fake_tensor)):
+		# 	self.preprocess(real_file, fake_file, vocab_file, real_tensor, fake_tensor)
+		# else:
+		# 	self.load_preprocessed(vocab_file, real_tensor, fake_tensor)
+
+		self.preprocess(real_file, fake_file, vocab_file, real_tensor, fake_tensor)
 
 		self.create_batches()
 		self.reset_batch_pointer()
@@ -53,14 +55,14 @@ class DiscriminatorBatcher(object):
 		np.save(tensor_file_real, self.tensor_real)
 		np.save(tensor_file_fake, self.tensor_fake)
 
-	def load_preprocessed(self, vocab_file, tensor_file_real, tensor_file_fake):
-		logging.debug('Loading preprocessed files...')
-		with open(vocab_file, 'r') as f:
-			self.chars = cPickle.load(f)
-		self.vocab_size  = len(self.chars)
-		self.vocab       = dict(zip(self.chars, range(len(self.chars))))
-		self.tensor_real = np.load(tensor_file_real)
-		self.tensor_fake = np.load(tensor_file_fake)	
+	# def load_preprocessed(self, vocab_file, tensor_file_real, tensor_file_fake):
+	# 	logging.debug('Loading preprocessed files...')
+	# 	with open(vocab_file, 'r') as f:
+	# 		self.chars = cPickle.load(f)
+	# 	self.vocab_size  = len(self.chars)
+	# 	self.vocab       = dict(zip(self.chars, range(len(self.chars))))
+	# 	self.tensor_real = np.load(tensor_file_real)
+	# 	self.tensor_fake = np.load(tensor_file_fake)	
 
 	def create_batches(self):
 		logging.debug('Creating batches...')

@@ -11,7 +11,7 @@ import os
 import cPickle
 
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.ERROR)
 
 
 def parse_args():
@@ -74,6 +74,7 @@ def train_generator(gan, args, sess, initial_load = True):
 						  args.seq_length)
 
 	logging.debug('Vocabulary...')
+	# TODO:  Why do this each time? Unnecessary
 	with open(os.path.join(args.save_dir_GAN, 'config.pkl'), 'w') as f:
 		cPickle.dump(args, f)
 	with open(os.path.join(args.save_dir_GAN, 'simple_vocab.pkl'), 'w') as f:
@@ -85,6 +86,7 @@ def train_generator(gan, args, sess, initial_load = True):
 	gan_saver = tf.train.Saver(gan_vars)
 
 	# Retrieve trainable Discriminator variables from dis_saver
+	# TODO:  Trainable vs. All Variables?
 	dis_vars = [v for v in tf.trainable_variables() if v.name.startswith('discriminator/')]
 	dis_saver = tf.train.Saver(dis_vars)
 
@@ -192,6 +194,8 @@ def train_discriminator(discriminator, args, sess):
 			
 def generate_samples(generator, args, sess, num_samples=1000):
 	'''Generate samples from the current version of the GAN'''
+	samples = []
+
 	with open(os.path.join(args.save_dir_GAN, 'config.pkl')) as f:
 		saved_args = cPickle.load(f)
 	with open(os.path.join(args.save_dir_GAN, args.vocab_file)) as f:
@@ -209,7 +213,13 @@ def generate_samples(generator, args, sess, num_samples=1000):
 	if ckpt and ckpt.model_checkpoint_path:
 		gen_saver.restore(sess, ckpt.model_checkpoint_path)
 	
-	return generator.generate_samples(sess, saved_args, chars, vocab, args.n)
+	for _ in xrange(num_samples / args.batch_size):
+		samples.append(generator.generate_samples(sess, saved_args, chars, vocab, args.n))
+
+	return samples
+
+def reset_reviews(data_dir, file_name):
+	open(os.path.join(data_dir, file_name), 'w').close()
 
 
 def adversarial_training(gan, discriminator, generator, args, sess):
@@ -220,7 +230,8 @@ def adversarial_training(gan, discriminator, generator, args, sess):
 	for epoch in xrange(args.num_epochs_GAN):
 		train_discriminator(discriminator, args, sess)
 		train_generator(gan, args, sess, initial_load = False)
-		generate_samples(generator, args, sess)
+		reset_reviews(args.data_dir, args.fake_input_file)
+		generate_samples(generator, args, sess, 100)
 	return
 
 

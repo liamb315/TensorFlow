@@ -141,7 +141,7 @@ class GAN(object):
 			for i, char in enumerate(char_arr):
 				sequence_matrix[i].append(char)
 		
-		with open(datafile, 'wb') as f:
+		with open(datafile, 'a+') as f:
 			for line in sequence_matrix:
 				print ''.join(line)
 				print>>f, ''.join(line) 
