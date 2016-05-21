@@ -52,7 +52,7 @@ def parse_args():
 		help='save frequency')
 	parser.add_argument('--grad_clip', type=float, default=5.,
 		help='clip gradients at this value')
-	parser.add_argument('--learning_rate_gen', type=float, default=0.002,
+	parser.add_argument('--learning_rate_gen', type=float, default=0.02,
 		help='learning rate')
 	parser.add_argument('--learning_rate_dis', type=float, default=0.0002,
 		help='learning rate for discriminator')
@@ -69,7 +69,7 @@ def train_generator(gan, args, sess, initial_load = True):
 	'''Train Generator via GAN'''
 	logging.debug('Training generator...')
 	
-	batcher  = GANBatcher(args.real_input_file, args.vocab_file, 
+	batcher  = GANBatcher(args.fake_input_file, args.vocab_file, 
 						  args.data_dir, args.batch_size, 
 						  args.seq_length)
 
@@ -91,7 +91,7 @@ def train_generator(gan, args, sess, initial_load = True):
 	dis_saver = tf.train.Saver(dis_vars)
 
 	if initial_load:
-		logging.debug('Initla load of GAN parameters...')
+		logging.debug('Initial load of GAN parameters...')
 		ckpt = tf.train.get_checkpoint_state(args.save_dir_GAN)
 		if ckpt and ckpt.model_checkpoint_path:
 			gan_saver.restore(sess, ckpt.model_checkpoint_path)
@@ -109,7 +109,7 @@ def train_generator(gan, args, sess, initial_load = True):
 		state_gen = gan.initial_state_gen.eval()
 		state_dis = gan.initial_state_dis.eval()
 
-		for batch in xrange(10):
+		for batch in xrange(50):
 		# for batch in xrange(batcher.num_batches):
 			start = time.time()
 			x, _  = batcher.next_batch()
@@ -215,8 +215,8 @@ def generate_samples(generator, args, sess, num_samples=1000):
 	
 	for _ in xrange(num_samples / args.batch_size):
 		samples.append(generator.generate_samples(sess, saved_args, chars, vocab, args.n))
-
 	return samples
+
 
 def reset_reviews(data_dir, file_name):
 	open(os.path.join(data_dir, file_name), 'w').close()
@@ -232,7 +232,6 @@ def adversarial_training(gan, discriminator, generator, args, sess):
 		train_generator(gan, args, sess, initial_load = False)
 		reset_reviews(args.data_dir, args.fake_input_file)
 		generate_samples(generator, args, sess, 100)
-	return
 
 
 if __name__=='__main__':
@@ -251,4 +250,5 @@ if __name__=='__main__':
 			logging.debug('Initializing variables in graph...')
 			tf.initialize_all_variables().run()
 
-			adversarial_training(gan, discriminator, generator, args, sess)
+			# adversarial_training(gan, discriminator, generator, args, sess)
+			train_generator(gan, args, sess, initial_load = True)
