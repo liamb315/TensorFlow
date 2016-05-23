@@ -106,18 +106,20 @@ def train_generator(gan, args, sess, initial_load = True):
 		new_lr = args.learning_rate_gen * (args.decay_rate ** epoch)
 		sess.run(tf.assign(gan.lr_gen, new_lr))
 		batcher.reset_batch_pointer()
-		state_gen = gan.initial_state_gen.eval()
-		state_dis = gan.initial_state_dis.eval()
+		# state_gen = gan.initial_state_gen.eval()
+		# state_dis = gan.initial_state_dis.eval()
 
 		for batch in xrange(50):
 		# for batch in xrange(batcher.num_batches):
 			start = time.time()
 			x, _  = batcher.next_batch()
 			y     = np.ones(x.shape)
+			# feed  = {gan.input_data: x, 
+			# 		gan.targets: y, 
+			# 		gan.initial_state_gen: state_gen, 
+			# 		gan.initial_state_dis: state_dis}
 			feed  = {gan.input_data: x, 
-					gan.targets: y, 
-					gan.initial_state_gen: state_gen, 
-					gan.initial_state_dis: state_dis}
+					gan.targets: y}		
 			gen_train_loss, _ = sess.run([gan.gen_cost, gan.gen_train_op], feed)
 			end   = time.time()
 
