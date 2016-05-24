@@ -48,11 +48,11 @@ def parse_args():
 		help='number of epochs to train generator')
 	parser.add_argument('--num_epochs_dis', type=int, default=1,
 		help='number of epochs to train discriminator')
-	parser.add_argument('--save_every', type=int, default=5,
+	parser.add_argument('--save_every', type=int, default=500,
 		help='save frequency')
 	parser.add_argument('--grad_clip', type=float, default=5.,
 		help='clip gradients at this value')
-	parser.add_argument('--learning_rate_gen', type=float, default=0.02,
+	parser.add_argument('--learning_rate_gen', type=float, default=0.0002,
 		help='learning rate')
 	parser.add_argument('--learning_rate_dis', type=float, default=0.0002,
 		help='learning rate for discriminator')

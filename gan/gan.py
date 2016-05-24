@@ -112,10 +112,10 @@ class GAN(object):
 
 		self.final_state_dis = last_state_dis
 		self.lr_gen = tf.Variable(0.0, trainable = False)		
-		
+		self.tvars 	= tf.trainable_variables()
+		gen_vars    = [v for v in self.tvars if v.name.startswith("generator/")]
+
 		if is_training:
-			self.tvars 	      = tf.trainable_variables()
-			gen_vars          = [v for v in self.tvars if v.name.startswith("generator/")]
 			gen_grads, _      = tf.clip_by_global_norm(tf.gradients(self.gen_cost, gen_vars, aggregation_method = 2), args.grad_clip)
 			gen_optimizer     = tf.train.AdamOptimizer(self.lr_gen)
 			self.gen_train_op = gen_optimizer.apply_gradients(zip(gen_grads, gen_vars))				
