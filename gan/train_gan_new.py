@@ -22,6 +22,8 @@ def parse_args():
 		help='fake reviews')
 	parser.add_argument('--data_dir', type=str, default='data/gan',
 		help='data directory containing reviews')
+	parser.add_argument('--log_dir', type=str, default='logs',
+		help='log directory for TensorBoard')
 	parser.add_argument('--vocab_file', type=str, default='simple_vocab.pkl',
 		help='data directory containing reviews')
 	parser.add_argument('--save_dir_GAN', type=str, default='models_GAN',
@@ -65,10 +67,10 @@ def parse_args():
 	return parser.parse_args()
 
 
-def train_generator(gan, args, sess, initial_load = True):
+def train_generator(gan, args, sess, train_writer, initial_load = True):
 	'''Train Generator via GAN'''
 	logging.debug('Training generator...')
-	
+
 	batcher  = GANBatcher(args.fake_input_file, args.vocab_file, 
 						  args.data_dir, args.batch_size, 
 						  args.seq_length)
@@ -120,7 +122,8 @@ def train_generator(gan, args, sess, initial_load = True):
 			# 		gan.initial_state_dis: state_dis}
 			feed  = {gan.input_data: x, 
 					gan.targets: y}		
-			gen_train_loss, _ = sess.run([gan.gen_cost, gan.gen_train_op], feed)
+			gen_train_loss, gen_summary, _ = sess.run([gan.gen_cost, gan.merged, gan.gen_train_op], feed)
+			train_writer.add_summary(gen_summary, batch)
 			end   = time.time()
 
 			print '{}/{} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}' \
@@ -249,8 +252,15 @@ if __name__=='__main__':
 			with tf.variable_scope('sampler'):
 				generator = GAN(args, is_training = False)
 
+			logging.debug('TensorBoard...')
+			train_writer = tf.train.SummaryWriter(args.log_dir, sess.graph)
+
 			logging.debug('Initializing variables in graph...')
 			tf.initialize_all_variables().run()
 
+			
+
 			# adversarial_training(gan, discriminator, generator, args, sess)
-			train_generator(gan, args, sess, initial_load = True)
+			train_generator(gan, args, sess, train_writer, initial_load = True)
+
+			

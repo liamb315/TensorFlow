@@ -8,6 +8,19 @@ from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.framework import ops
 
+def variable_summaries(var, name):
+	'''Attach a lot of summaries to a Tensor.'''
+	with tf.name_scope('summaries'):
+		mean = tf.reduce_mean(var)
+		tf.scalar_summary('mean/' + name, mean)
+		with tf.name_scope('stddev'):
+			stddev = tf.sqrt(tf.reduce_sum(tf.square(var - mean)))
+		tf.scalar_summary('sttdev/' + name, stddev)
+		tf.scalar_summary('max/' + name, tf.reduce_max(var))
+		tf.scalar_summary('min/' + name, tf.reduce_min(var))
+		tf.histogram_summary(name, var)
+
+
 class GAN(object):
 	def __init__(self, args, is_training=True):
 
@@ -114,6 +127,11 @@ class GAN(object):
 		self.lr_gen = tf.Variable(0.0, trainable = False)		
 		self.tvars 	= tf.trainable_variables()
 		gen_vars    = [v for v in self.tvars if v.name.startswith("generator/")]
+
+		for v in gen_vars:
+			variable_summaries(v, v.op.name+'/weights')
+
+		self.merged = tf.merge_all_summaries()
 
 		if is_training:
 			gen_grads, _      = tf.clip_by_global_norm(tf.gradients(self.gen_cost, gen_vars, aggregation_method = 2), args.grad_clip)

@@ -1,5 +1,6 @@
 gan/data
 gan/models
+gan/logs
 gan/vocab
 gan/models_generator
 gan/models_discriminator
