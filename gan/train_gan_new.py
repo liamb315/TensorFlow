@@ -247,18 +247,16 @@ if __name__=='__main__':
 
 			logging.debug('Creating models...')
 			gan = GAN(args, is_training = True)
-			with tf.variable_scope('classic'):
-				discriminator = Discriminator(args, is_training = True)
-			with tf.variable_scope('sampler'):
-				generator = GAN(args, is_training = False)
+			# with tf.variable_scope('classic'):
+			# 	discriminator = Discriminator(args, is_training = True)
+			# with tf.variable_scope('sampler'):
+			# 	generator = GAN(args, is_training = False)
 
 			logging.debug('TensorBoard...')
 			train_writer = tf.train.SummaryWriter(args.log_dir, sess.graph)
 
 			logging.debug('Initializing variables in graph...')
 			tf.initialize_all_variables().run()
-
-			
 
 			# adversarial_training(gan, discriminator, generator, args, sess)
 			train_generator(gan, args, sess, train_writer, initial_load = True)

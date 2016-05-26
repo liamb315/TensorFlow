@@ -41,11 +41,6 @@ class GAN(object):
 		else:
 			raise Exception('model type not supported: {}'.format(args.model))
 
-		with tf.variable_scope('generator'):
-			self.cell_gen = rnn_cell.MultiRNNCell([self.cell_gen] * args.num_layers)
-		with tf.variable_scope('discriminator'):
-			self.cell_dis = rnn_cell.MultiRNNCell([self.cell_dis] * args.num_layers)
-
 		# Pass the generated sequences and targets (1)
 		self.input_data  = tf.placeholder(tf.int32, [args.batch_size, seq_length])
 		self.targets     = tf.placeholder(tf.int32, [args.batch_size, seq_length])
@@ -54,6 +49,7 @@ class GAN(object):
 		# Generator
 		############
 		with tf.variable_scope('generator'):
+			self.cell_gen = rnn_cell.MultiRNNCell([self.cell_gen] * args.num_layers)
 			self.initial_state_gen = self.cell_gen.zero_state(args.batch_size, tf.float32)	
 
 			with tf.variable_scope('rnn'):
@@ -89,6 +85,7 @@ class GAN(object):
 		################
 		# Pass a tensor of *probabilities* over the characters to the Discriminator
 		with tf.variable_scope('discriminator'):
+			self.cell_dis = rnn_cell.MultiRNNCell([self.cell_dis] * args.num_layers)
 			self.initial_state_dis = self.cell_dis.zero_state(args.batch_size, tf.float32)
 
 			with tf.variable_scope('rnn'):
