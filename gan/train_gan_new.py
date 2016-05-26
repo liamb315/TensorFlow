@@ -111,7 +111,7 @@ def train_generator(gan, args, sess, train_writer, initial_load = True):
 		# state_gen = gan.initial_state_gen.eval()
 		# state_dis = gan.initial_state_dis.eval()
 
-		for batch in xrange(50):
+		for batch in xrange(25):
 		# for batch in xrange(batcher.num_batches):
 			start = time.time()
 			x, _  = batcher.next_batch()
@@ -257,8 +257,6 @@ if __name__=='__main__':
 
 			logging.debug('Initializing variables in graph...')
 			tf.initialize_all_variables().run()
-
-			
 
 			# adversarial_training(gan, discriminator, generator, args, sess)
 			train_generator(gan, args, sess, train_writer, initial_load = True)
