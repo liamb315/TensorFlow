@@ -128,15 +128,20 @@ class GAN(object):
 		self.tvars 	= tf.trainable_variables()
 		gen_vars    = [v for v in self.tvars if v.name.startswith("generator/")]
 
-		for v in gen_vars:
-			variable_summaries(v, v.op.name+'/weights')
+		with tf.name_scope('weights'):
+			for v in gen_vars:
+				variable_summaries(v, v.op.name+'/weights')
 
 		self.merged = tf.merge_all_summaries()
 
 		if is_training:
-			gen_grads, _      = tf.clip_by_global_norm(tf.gradients(self.gen_cost, gen_vars, aggregation_method = 2), args.grad_clip)
-			gen_optimizer     = tf.train.AdamOptimizer(self.lr_gen)
-			self.gen_train_op = gen_optimizer.apply_gradients(zip(gen_grads, gen_vars))				
+			gen_grads            = tf.gradients(self.gen_cost, gen_vars, aggregation_method = 2)
+			with tf.name_scope('gradients'):
+				for v in gen_grads:
+					variable_summaries(v, v.op.name+'/grads')
+			gen_grads_clipped, _ = tf.clip_by_global_norm(gen_grads, args.grad_clip)
+			gen_optimizer        = tf.train.AdamOptimizer(self.lr_gen)
+			self.gen_train_op    = gen_optimizer.apply_gradients(zip(gen_grads_clipped, gen_vars))				
 
 		
 	def generate_samples(self, sess, args, chars, vocab, seq_length = 200, initial = ' ', datafile = 'data/gan/fake_reviews.txt'):

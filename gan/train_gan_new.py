@@ -54,7 +54,7 @@ def parse_args():
 		help='save frequency')
 	parser.add_argument('--grad_clip', type=float, default=5.,
 		help='clip gradients at this value')
-	parser.add_argument('--learning_rate_gen', type=float, default=0.0002,
+	parser.add_argument('--learning_rate_gen', type=float, default=0.02,
 		help='learning rate')
 	parser.add_argument('--learning_rate_dis', type=float, default=0.0002,
 		help='learning rate for discriminator')
@@ -247,10 +247,10 @@ if __name__=='__main__':
 
 			logging.debug('Creating models...')
 			gan = GAN(args, is_training = True)
-			with tf.variable_scope('classic'):
-				discriminator = Discriminator(args, is_training = True)
-			with tf.variable_scope('sampler'):
-				generator = GAN(args, is_training = False)
+			# with tf.variable_scope('classic'):
+			# 	discriminator = Discriminator(args, is_training = True)
+			# with tf.variable_scope('sampler'):
+			# 	generator = GAN(args, is_training = False)
 
 			logging.debug('TensorBoard...')
 			train_writer = tf.train.SummaryWriter(args.log_dir, sess.graph)
