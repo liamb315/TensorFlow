@@ -10,15 +10,17 @@ from tensorflow.python.framework import ops
 
 def variable_summaries(var, name):
 	'''Attach a lot of summaries to a Tensor.'''
-	with tf.name_scope('summaries'):
-		mean = tf.reduce_mean(var)
-		tf.scalar_summary('mean/' + name, mean)
-		with tf.name_scope('stddev'):
-			stddev = tf.sqrt(tf.reduce_sum(tf.square(var - mean)))
-		tf.scalar_summary('sttdev/' + name, stddev)
-		tf.scalar_summary('max/' + name, tf.reduce_max(var))
-		tf.scalar_summary('min/' + name, tf.reduce_min(var))
-		tf.histogram_summary(name, var)
+	# with tf.name_scope('summaries'):
+	mean = tf.reduce_mean(var)
+	tf.scalar_summary('mean/' + name, mean)
+	with tf.name_scope('stddev'):
+		stddev = tf.sqrt(tf.reduce_sum(tf.square(var - mean)))
+	tf.scalar_summary('sttdev/' + name, stddev)
+	tf.scalar_summary('max/' + name, tf.reduce_max(var))
+	tf.scalar_summary('min/' + name, tf.reduce_min(var))
+	tf.histogram_summary(name, var)
+	
+		
 
 
 class GAN(object):
@@ -112,33 +114,34 @@ class GAN(object):
 				self.logits = tf.nn.xw_plus_b(output_tf, softmax_w, softmax_b)
 				self.probs  = tf.nn.softmax(self.logits)
 
-		gen_loss = seq2seq.sequence_loss_by_example(
-			[self.logits],
-			[tf.reshape(self.targets, [-1])], 
-			[tf.ones([args.batch_size * seq_length])],
-			2)
+		with tf.name_scope('loss'):
+			gen_loss = seq2seq.sequence_loss_by_example(
+				[self.logits],
+				[tf.reshape(self.targets, [-1])], 
+				[tf.ones([args.batch_size * seq_length])],
+				2)
 
-		self.gen_cost = tf.reduce_sum(gen_loss) / args.batch_size / seq_length
+			self.gen_cost = tf.reduce_sum(gen_loss) / args.batch_size / seq_length
 
 		self.final_state_dis = last_state_dis
 		self.lr_gen = tf.Variable(0.0, trainable = False)		
 		self.tvars 	= tf.trainable_variables()
 		gen_vars    = [v for v in self.tvars if v.name.startswith("generator/")]
 
-		with tf.name_scope('weights'):
+		with tf.name_scope('weight_summary'):
 			for v in gen_vars:
 				variable_summaries(v, v.op.name+'/weights')
 
-		self.merged = tf.merge_all_summaries()
-
 		if is_training:
 			gen_grads            = tf.gradients(self.gen_cost, gen_vars, aggregation_method = 2)
-			with tf.name_scope('gradients'):
+			with tf.name_scope('grad_summary'):
 				for v in gen_grads:
 					variable_summaries(v, v.op.name+'/grads')
 			gen_grads_clipped, _ = tf.clip_by_global_norm(gen_grads, args.grad_clip)
 			gen_optimizer        = tf.train.AdamOptimizer(self.lr_gen)
 			self.gen_train_op    = gen_optimizer.apply_gradients(zip(gen_grads_clipped, gen_vars))				
+
+		self.merged = tf.merge_all_summaries()
 
 		
 	def generate_samples(self, sess, args, chars, vocab, seq_length = 200, initial = ' ', datafile = 'data/gan/fake_reviews.txt'):

@@ -30,15 +30,15 @@ def parse_args():
 		help='directory to store checkpointed GAN models')
 	parser.add_argument('--save_dir_dis', type=str, default='models_GAN/discriminator',
 		help='directory to store checkpointed discriminator models')
-	parser.add_argument('--rnn_size', type=int, default=128,
+	parser.add_argument('--rnn_size', type=int, default=256,
 		help='size of RNN hidden state')
 	parser.add_argument('--num_layers', type=int, default=2,
 		help='number of layers in the RNN')
 	parser.add_argument('--model', type=str, default='lstm',
 		help='rnn, gru, or lstm')
-	parser.add_argument('--batch_size', type=int, default=50,
+	parser.add_argument('--batch_size', type=int, default=10,
 		help='minibatch size')
-	parser.add_argument('--seq_length', type=int, default=200,
+	parser.add_argument('--seq_length', type=int, default=20,
 		help='RNN sequence length')
 	parser.add_argument('-n', type=int, default=500,
 		help='number of characters to sample')
@@ -54,7 +54,7 @@ def parse_args():
 		help='save frequency')
 	parser.add_argument('--grad_clip', type=float, default=5.,
 		help='clip gradients at this value')
-	parser.add_argument('--learning_rate_gen', type=float, default=0.02,
+	parser.add_argument('--learning_rate_gen', type=float, default=1.0,
 		help='learning rate')
 	parser.add_argument('--learning_rate_dis', type=float, default=0.0002,
 		help='learning rate for discriminator')
@@ -92,17 +92,17 @@ def train_generator(gan, args, sess, train_writer, initial_load = True):
 	dis_vars = [v for v in tf.trainable_variables() if v.name.startswith('discriminator/')]
 	dis_saver = tf.train.Saver(dis_vars)
 
-	if initial_load:
-		logging.debug('Initial load of GAN parameters...')
-		ckpt = tf.train.get_checkpoint_state(args.save_dir_GAN)
-		if ckpt and ckpt.model_checkpoint_path:
-			gan_saver.restore(sess, ckpt.model_checkpoint_path)
+	# if initial_load:
+	# 	logging.debug('Initial load of GAN parameters...')
+	# 	ckpt = tf.train.get_checkpoint_state(args.save_dir_GAN)
+	# 	if ckpt and ckpt.model_checkpoint_path:
+	# 		gan_saver.restore(sess, ckpt.model_checkpoint_path)
 	
-	else:
-		logging.debug('Update GAN parameters from Discriminator...')		
-		ckpt = tf.train.get_checkpoint_state(args.save_dir_dis)
-		if ckpt and ckpt.model_checkpoint_path:
-			dis_saver.restore(sess, ckpt.model_checkpoint_path)
+	# else:
+	# 	logging.debug('Update GAN parameters from Discriminator...')		
+	# 	ckpt = tf.train.get_checkpoint_state(args.save_dir_dis)
+	# 	if ckpt and ckpt.model_checkpoint_path:
+	# 		dis_saver.restore(sess, ckpt.model_checkpoint_path)
 
 	for epoch in xrange(args.num_epochs_gen):
 		new_lr = args.learning_rate_gen * (args.decay_rate ** epoch)
@@ -111,7 +111,7 @@ def train_generator(gan, args, sess, train_writer, initial_load = True):
 		# state_gen = gan.initial_state_gen.eval()
 		# state_dis = gan.initial_state_dis.eval()
 
-		for batch in xrange(25):
+		for batch in xrange(250):
 		# for batch in xrange(batcher.num_batches):
 			start = time.time()
 			x, _  = batcher.next_batch()
@@ -123,6 +123,7 @@ def train_generator(gan, args, sess, train_writer, initial_load = True):
 			feed  = {gan.input_data: x, 
 					gan.targets: y}		
 			gen_train_loss, gen_summary, _ = sess.run([gan.gen_cost, gan.merged, gan.gen_train_op], feed)
+
 			train_writer.add_summary(gen_summary, batch)
 			end   = time.time()
 
@@ -260,5 +261,3 @@ if __name__=='__main__':
 
 			# adversarial_training(gan, discriminator, generator, args, sess)
 			train_generator(gan, args, sess, train_writer, initial_load = True)
-
-			
