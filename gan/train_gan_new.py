@@ -30,7 +30,7 @@ def parse_args():
 		help='directory to store checkpointed GAN models')
 	parser.add_argument('--save_dir_dis', type=str, default='models_GAN/discriminator',
 		help='directory to store checkpointed discriminator models')
-	parser.add_argument('--rnn_size', type=int, default=256,
+	parser.add_argument('--rnn_size', type=int, default=128,
 		help='size of RNN hidden state')
 	parser.add_argument('--num_layers', type=int, default=2,
 		help='number of layers in the RNN')
@@ -108,21 +108,26 @@ def train_generator(gan, args, sess, train_writer, initial_load = True):
 		new_lr = args.learning_rate_gen * (args.decay_rate ** epoch)
 		sess.run(tf.assign(gan.lr_gen, new_lr))
 		batcher.reset_batch_pointer()
-		# state_gen = gan.initial_state_gen.eval()
-		# state_dis = gan.initial_state_dis.eval()
+		state_gen = gan.initial_state_gen.eval()
+		state_dis = gan.initial_state_dis.eval()
 
-		for batch in xrange(250):
+		for batch in xrange(25):
 		# for batch in xrange(batcher.num_batches):
 			start = time.time()
 			x, _  = batcher.next_batch()
 			y     = np.ones(x.shape)
-			# feed  = {gan.input_data: x, 
-			# 		gan.targets: y, 
-			# 		gan.initial_state_gen: state_gen, 
-			# 		gan.initial_state_dis: state_dis}
 			feed  = {gan.input_data: x, 
-					gan.targets: y}		
-			gen_train_loss, gen_summary, _ = sess.run([gan.gen_cost, gan.merged, gan.gen_train_op], feed)
+					gan.targets: y, 
+					gan.initial_state_gen: state_gen, 
+					gan.initial_state_dis: state_dis}
+			# feed  = {gan.input_data: x, 
+					# gan.targets: y}		
+			gen_train_loss, gen_summary, state_gen, state_dis, _ = sess.run([
+				gan.gen_cost, 
+				gan.merged,
+				gan.final_state_gen,
+				gan.final_state_dis, 
+				gan.gen_train_op], feed)
 
 			train_writer.add_summary(gen_summary, batch)
 			end   = time.time()

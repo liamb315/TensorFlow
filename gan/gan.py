@@ -133,7 +133,8 @@ class GAN(object):
 				variable_summaries(v, v.op.name+'/weights')
 
 		if is_training:
-			gen_grads            = tf.gradients(self.gen_cost, gen_vars, aggregation_method = 2)
+			# gen_grads            = tf.gradients(self.gen_cost, gen_vars, aggregation_method = 2)
+			gen_grads            = tf.gradients(self.gen_cost, self.tvars, aggregation_method = 2)
 			with tf.name_scope('grad_summary'):
 				for v in gen_grads:
 					variable_summaries(v, v.op.name+'/grads')
