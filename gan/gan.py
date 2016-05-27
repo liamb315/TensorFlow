@@ -44,8 +44,11 @@ class GAN(object):
 			raise Exception('model type not supported: {}'.format(args.model))
 
 		# Pass the generated sequences and targets (1)
-		self.input_data  = tf.placeholder(tf.int32, [args.batch_size, seq_length])
-		self.targets     = tf.placeholder(tf.int32, [args.batch_size, seq_length])
+		with tf.name_scope('input'):
+			with tf.name_scope('data'):
+				self.input_data  = tf.placeholder(tf.int32, [args.batch_size, seq_length])
+			with tf.name_scope('targets'):
+				self.targets     = tf.placeholder(tf.int32, [args.batch_size, seq_length])
 
 		############
 		# Generator
@@ -113,8 +116,11 @@ class GAN(object):
 				output_tf   = tf.reshape(tf.concat(1, outputs_dis), [-1, args.rnn_size])
 				self.logits = tf.nn.xw_plus_b(output_tf, softmax_w, softmax_b)
 				self.probs  = tf.nn.softmax(self.logits)
+				with tf.name_scope('summary'):
+					variable_summaries(self.probs, 'probabilities')
+			self.final_state_dis = last_state_dis
 
-		with tf.name_scope('loss'):
+		with tf.name_scope('train'):
 			gen_loss = seq2seq.sequence_loss_by_example(
 				[self.logits],
 				[tf.reshape(self.targets, [-1])], 
@@ -122,25 +128,27 @@ class GAN(object):
 				2)
 
 			self.gen_cost = tf.reduce_sum(gen_loss) / args.batch_size / seq_length
+			tf.scalar_summary('training loss', self.gen_cost)
+			self.lr_gen = tf.Variable(0.0, trainable = False)		
+			self.tvars 	= tf.trainable_variables()
+			gen_vars    = [v for v in self.tvars if v.name.startswith("generator/")]
 
-		self.final_state_dis = last_state_dis
-		self.lr_gen = tf.Variable(0.0, trainable = False)		
-		self.tvars 	= tf.trainable_variables()
-		gen_vars    = [v for v in self.tvars if v.name.startswith("generator/")]
+			if is_training:
+				# gen_grads            = tf.gradients(self.gen_cost, gen_vars, aggregation_method = 2)
+				gen_grads            = tf.gradients(self.gen_cost, self.tvars, aggregation_method = 2)	
+				gen_grads_clipped, _ = tf.clip_by_global_norm(gen_grads, args.grad_clip)
+				# gen_optimizer        = tf.train.AdamOptimizer(self.lr_gen)
+				gen_optimizer        = tf.train.GradientDescentOptimizer(self.lr_gen)
+				self.gen_train_op    = gen_optimizer.apply_gradients(zip(gen_grads_clipped, gen_vars))				
 
-		with tf.name_scope('weight_summary'):
-			for v in gen_vars:
-				variable_summaries(v, v.op.name+'/weights')
+		with tf.name_scope('summary'):
+			with tf.name_scope('weight_summary'):
+				for v in gen_vars:
+					variable_summaries(v, v.op.name+'/weights')
 
-		if is_training:
-			# gen_grads            = tf.gradients(self.gen_cost, gen_vars, aggregation_method = 2)
-			gen_grads            = tf.gradients(self.gen_cost, self.tvars, aggregation_method = 2)
 			with tf.name_scope('grad_summary'):
 				for v in gen_grads:
 					variable_summaries(v, v.op.name+'/grads')
-			gen_grads_clipped, _ = tf.clip_by_global_norm(gen_grads, args.grad_clip)
-			gen_optimizer        = tf.train.AdamOptimizer(self.lr_gen)
-			self.gen_train_op    = gen_optimizer.apply_gradients(zip(gen_grads_clipped, gen_vars))				
 
 		self.merged = tf.merge_all_summaries()
 
