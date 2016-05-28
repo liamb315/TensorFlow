@@ -6,6 +6,7 @@ from argparse import ArgumentParser
 from batcher_new import DiscriminatorBatcher, GANBatcher
 from gan import GAN
 from discriminator import Discriminator
+from generator import Generator
 import time
 import os
 import cPickle
@@ -253,10 +254,11 @@ if __name__=='__main__':
 
 			logging.debug('Creating models...')
 			gan = GAN(args, is_training = True)
-			# with tf.variable_scope('classic'):
-			# 	discriminator = Discriminator(args, is_training = True)
-			# with tf.variable_scope('sampler'):
+			with tf.variable_scope('classic'):
+				discriminator = Discriminator(args, is_training = True)
+			with tf.variable_scope('sampler'):
 			# 	generator = GAN(args, is_training = False)
+				generator = Generator(args, is_training = True)
 
 			logging.debug('TensorBoard...')
 			train_writer = tf.train.SummaryWriter(args.log_dir, sess.graph)

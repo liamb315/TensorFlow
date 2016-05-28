@@ -113,11 +113,12 @@ class GAN(object):
 					outputs_dis.append(output_dis)
 				last_state_dis = state_dis
 
-				output_tf   = tf.reshape(tf.concat(1, outputs_dis), [-1, args.rnn_size])
-				self.logits = tf.nn.xw_plus_b(output_tf, softmax_w, softmax_b)
-				self.probs  = tf.nn.softmax(self.logits)
-				with tf.name_scope('summary'):
-					variable_summaries(self.probs, 'probabilities')
+			output_tf   = tf.reshape(tf.concat(1, outputs_dis), [-1, args.rnn_size])
+			self.logits = tf.nn.xw_plus_b(output_tf, softmax_w, softmax_b)
+			self.probs  = tf.nn.softmax(self.logits)
+			with tf.name_scope('summary'):
+				prob_real = tf.slice(self.probs, [0,1], [args.seq_length, 1])
+				variable_summaries(prob_real, 'probability of real')
 			self.final_state_dis = last_state_dis
 
 		with tf.name_scope('train'):
@@ -131,19 +132,20 @@ class GAN(object):
 			tf.scalar_summary('training loss', self.gen_cost)
 			self.lr_gen = tf.Variable(0.0, trainable = False)		
 			self.tvars 	= tf.trainable_variables()
-			gen_vars    = [v for v in self.tvars if v.name.startswith("generator/")]
+			gen_vars    = [v for v in self.tvars if not v.name.startswith("discriminator/")]
 
 			if is_training:
-				# gen_grads            = tf.gradients(self.gen_cost, gen_vars, aggregation_method = 2)
-				gen_grads            = tf.gradients(self.gen_cost, self.tvars, aggregation_method = 2)	
+				gen_grads            = tf.gradients(self.gen_cost, gen_vars, aggregation_method = 2)
 				gen_grads_clipped, _ = tf.clip_by_global_norm(gen_grads, args.grad_clip)
 				# gen_optimizer        = tf.train.AdamOptimizer(self.lr_gen)
 				gen_optimizer        = tf.train.GradientDescentOptimizer(self.lr_gen)
 				self.gen_train_op    = gen_optimizer.apply_gradients(zip(gen_grads_clipped, gen_vars))				
 
+
 		with tf.name_scope('summary'):
 			with tf.name_scope('weight_summary'):
-				for v in gen_vars:
+				for v in self.tvars:
+				# for v in gen_vars:
 					variable_summaries(v, v.op.name+'/weights')
 
 			with tf.name_scope('grad_summary'):
