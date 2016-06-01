@@ -33,7 +33,7 @@ def parse_args():
 		help='directory to store checkpointed discriminator models')
 	parser.add_argument('--rnn_size', type=int, default=128,
 		help='size of RNN hidden state')
-	parser.add_argument('--num_layers', type=int, default=2,
+	parser.add_argument('--num_layers', type=int, default=1,
 		help='number of layers in the RNN')
 	parser.add_argument('--model', type=str, default='lstm',
 		help='rnn, gru, or lstm')
@@ -55,7 +55,7 @@ def parse_args():
 		help='save frequency')
 	parser.add_argument('--grad_clip', type=float, default=5.,
 		help='clip gradients at this value')
-	parser.add_argument('--learning_rate_gen', type=float, default=1.0,
+	parser.add_argument('--learning_rate_gen', type=float, default=0.001,
 		help='learning rate')
 	parser.add_argument('--learning_rate_dis', type=float, default=0.0002,
 		help='learning rate for discriminator')
@@ -112,7 +112,7 @@ def train_generator(gan, args, sess, train_writer, initial_load = True):
 		state_gen = gan.initial_state_gen.eval()
 		state_dis = gan.initial_state_dis.eval()
 
-		for batch in xrange(50):
+		for batch in xrange(500):
 		# for batch in xrange(batcher.num_batches):
 			start = time.time()
 			x, _  = batcher.next_batch()
@@ -248,17 +248,17 @@ def adversarial_training(gan, discriminator, generator, args, sess):
 
 if __name__=='__main__':
 	args = parse_args()
+	gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.01)
 
 	with tf.device('/gpu:3'):
-		with tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)) as sess:
+		with tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=True, gpu_options=gpu_options)) as sess:
 
 			logging.debug('Creating models...')
 			gan = GAN(args, is_training = True)
 			with tf.variable_scope('classic'):
 				discriminator = Discriminator(args, is_training = True)
-			with tf.variable_scope('sampler'):
+			# with tf.variable_scope('sampler'):
 			# 	generator = GAN(args, is_training = False)
-				generator = Generator(args, is_training = True)
 
 			logging.debug('TensorBoard...')
 			train_writer = tf.train.SummaryWriter(args.log_dir, sess.graph)

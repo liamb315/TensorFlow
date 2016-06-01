@@ -66,23 +66,15 @@ class GAN(object):
 					inputs_gen = tf.split(1, seq_length, tf.nn.embedding_lookup(embedding, self.input_data))
 					inputs_gen = [tf.squeeze(i, [1]) for i in inputs_gen]
 
-			def loop(prev, _):
-				prev = tf.nn.xw_plus_b(prev, softmax_w, softmax_b)
-				prev_symbol = tf.stop_gradient(tf.argmax(prev, 1))
-				return tf.nn.embedding_lookup(embedding, prev_symbol)
-
 			outputs_gen, last_state_gen = seq2seq.rnn_decoder(inputs_gen, self.initial_state_gen, 
-				self.cell_gen, loop_function=None if is_training else loop, scope='rnn')
+				self.cell_gen, loop_function=None)
 			
-			#  Dim: [args.batch_size * seq_length, args.rnn_size]
-			output_gen      = tf.reshape(tf.concat(1, outputs_gen), [-1, args.rnn_size])
+			outputs = []
+			for output_gen in outputs_gen:
+				logits_gen         = tf.nn.xw_plus_b(output_gen, softmax_w, softmax_b)
+				probs_gen_grouped  = tf.nn.softmax(logits_gen)
+				outputs.append(probs_gen_grouped)
 
-			#  Dim: [args.batch_size * seq_length, args.vocab_size]
-			self.logits_gen         = tf.nn.xw_plus_b(output_gen, softmax_w, softmax_b)
-			self.probs_gen_grouped  = tf.nn.softmax(self.logits_gen)
-
-			# Dim:  [args.batch_size, seq_length, args.vocab_size]
-			self.probs_gen       = tf.reshape(self.probs_gen_grouped, [args.batch_size, seq_length, args.vocab_size])
 			self.final_state_gen = last_state_gen
 
 		################
@@ -98,37 +90,37 @@ class GAN(object):
 				softmax_b = tf.get_variable('softmax_b', [2])
 
 				with tf.device('/cpu:0'):
+					inputs_dis = []
 					embedding  = tf.get_variable('embedding', [args.vocab_size, args.rnn_size])
-					inputs_dis = tf.split(1, seq_length, self.probs_gen)
-					inputs_dis = [tf.matmul(tf.squeeze(i, [1]), embedding) for i in inputs_dis]
-
-				self.inputs_dis = inputs_dis
+					for input_prob in outputs:
+						inputs_dis.append(tf.matmul(input_prob, embedding))
+					
 				state_dis   = self.initial_state_dis
 				outputs_dis = []
 
-				for i, inp in enumerate(inputs_dis):
-					if i > 0:
-						tf.get_variable_scope().reuse_variables()
-					output_dis, state_dis = self.cell_dis(inp, state_dis)
-					outputs_dis.append(output_dis)
-				last_state_dis = state_dis
+				outputs_dis, last_state_dis = seq2seq.rnn_decoder(inputs_dis, self.initial_state_dis, 
+					self.cell_dis, loop_function=None)
 
-			output_tf   = tf.reshape(tf.concat(1, outputs_dis), [-1, args.rnn_size])
-			self.logits = tf.nn.xw_plus_b(output_tf, softmax_w, softmax_b)
-			self.probs  = tf.nn.softmax(self.logits)
-			with tf.name_scope('summary'):
-				prob_real = tf.slice(self.probs, [0,1], [args.seq_length, 1])
-				variable_summaries(prob_real, 'probability of real')
+			probs = []
+			logits = []
+			for output_dis in outputs_dis:
+				logit = tf.nn.xw_plus_b(output_dis, softmax_w, softmax_b)
+				prob = tf.nn.softmax(logit)
+				logits.append(logit)
+				probs.append(prob)
+
+			#with tf.name_scope('summary'):
+			#	prob_real = tf.slice(probs, [0,1], [args.seq_length, 1])
+			#	variable_summaries(prob_real, 'probability of real')
 			self.final_state_dis = last_state_dis
 
 		with tf.name_scope('train'):
 			gen_loss = seq2seq.sequence_loss_by_example(
-				[self.logits],
-				[tf.reshape(self.targets, [-1])], 
-				[tf.ones([args.batch_size * seq_length])],
-				2)
+				logits,
+				tf.unpack(tf.transpose(self.targets)), 
+				tf.unpack(tf.transpose(tf.ones_like(self.targets, dtype=tf.float32))))
 
-			self.gen_cost = tf.reduce_sum(gen_loss) / args.batch_size / seq_length
+			self.gen_cost = tf.reduce_sum(gen_loss) / args.batch_size
 			tf.scalar_summary('training loss', self.gen_cost)
 			self.lr_gen = tf.Variable(0.0, trainable = False)		
 			self.tvars 	= tf.trainable_variables()
@@ -137,8 +129,8 @@ class GAN(object):
 			if is_training:
 				gen_grads            = tf.gradients(self.gen_cost, gen_vars, aggregation_method = 2)
 				gen_grads_clipped, _ = tf.clip_by_global_norm(gen_grads, args.grad_clip)
-				# gen_optimizer        = tf.train.AdamOptimizer(self.lr_gen)
-				gen_optimizer        = tf.train.GradientDescentOptimizer(self.lr_gen)
+				gen_optimizer        = tf.train.AdamOptimizer(self.lr_gen)
+				# gen_optimizer        = tf.train.GradientDescentOptimizer(self.lr_gen)
 				self.gen_train_op    = gen_optimizer.apply_gradients(zip(gen_grads_clipped, gen_vars))				
 
 
