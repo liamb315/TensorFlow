@@ -71,9 +71,9 @@ class GAN(object):
 			
 			outputs = []
 			for output_gen in outputs_gen:
-				logits_gen         = tf.nn.xw_plus_b(output_gen, softmax_w, softmax_b)
-				probs_gen_grouped  = tf.nn.softmax(logits_gen)
-				outputs.append(probs_gen_grouped)
+				logits_gen  = tf.nn.xw_plus_b(output_gen, softmax_w, softmax_b)
+				probs_gen   = tf.nn.softmax(logits_gen)
+				outputs.append(probs_gen)
 
 			self.final_state_gen = last_state_gen
 
@@ -101,8 +101,7 @@ class GAN(object):
 				outputs_dis, last_state_dis = seq2seq.rnn_decoder(inputs_dis, self.initial_state_dis, 
 					self.cell_dis, loop_function=None)
 
-			probs = []
-			logits = []
+			probs, logits = [], []
 			for output_dis in outputs_dis:
 				logit = tf.nn.xw_plus_b(output_dis, softmax_w, softmax_b)
 				prob = tf.nn.softmax(logit)

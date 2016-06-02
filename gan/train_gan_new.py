@@ -33,7 +33,7 @@ def parse_args():
 		help='directory to store checkpointed discriminator models')
 	parser.add_argument('--rnn_size', type=int, default=128,
 		help='size of RNN hidden state')
-	parser.add_argument('--num_layers', type=int, default=1,
+	parser.add_argument('--num_layers', type=int, default=2,
 		help='number of layers in the RNN')
 	parser.add_argument('--model', type=str, default='lstm',
 		help='rnn, gru, or lstm')
@@ -112,11 +112,12 @@ def train_generator(gan, args, sess, train_writer, initial_load = True):
 		state_gen = gan.initial_state_gen.eval()
 		state_dis = gan.initial_state_dis.eval()
 
-		for batch in xrange(500):
+		for batch in xrange(100):
 		# for batch in xrange(batcher.num_batches):
 			start = time.time()
 			x, _  = batcher.next_batch()
 			y     = np.ones(x.shape)
+			print x, y
 			feed  = {gan.input_data: x, 
 					gan.targets: y, 
 					gan.initial_state_gen: state_gen, 
