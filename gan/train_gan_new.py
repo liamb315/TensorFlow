@@ -55,7 +55,7 @@ def parse_args():
 		help='save frequency')
 	parser.add_argument('--grad_clip', type=float, default=5.,
 		help='clip gradients at this value')
-	parser.add_argument('--learning_rate_gen', type=float, default=0.1,
+	parser.add_argument('--learning_rate_gen', type=float, default=0.01,
 		help='learning rate')
 	parser.add_argument('--learning_rate_dis', type=float, default=0.0002,
 		help='learning rate for discriminator')
@@ -68,7 +68,7 @@ def parse_args():
 	return parser.parse_args()
 
 
-def train_generator(gan, args, sess, train_writer, initial_load = True):
+def train_generator(gan, args, sess, train_writer, weights_load = 'random'):
 	'''Train Generator via GAN'''
 	logging.debug('Training generator...')
 
@@ -93,17 +93,20 @@ def train_generator(gan, args, sess, train_writer, initial_load = True):
 	dis_vars = [v for v in tf.trainable_variables() if v.name.startswith('discriminator/')]
 	dis_saver = tf.train.Saver(dis_vars)
 
-	# if initial_load:
-	# 	logging.debug('Initial load of GAN parameters...')
-	# 	ckpt = tf.train.get_checkpoint_state(args.save_dir_GAN)
-	# 	if ckpt and ckpt.model_checkpoint_path:
-	# 		gan_saver.restore(sess, ckpt.model_checkpoint_path)
-	
-	# else:
-	# 	logging.debug('Update GAN parameters from Discriminator...')		
-	# 	ckpt = tf.train.get_checkpoint_state(args.save_dir_dis)
-	# 	if ckpt and ckpt.model_checkpoint_path:
-	# 		dis_saver.restore(sess, ckpt.model_checkpoint_path)
+	if weights_load is 'random':
+		logging.debug('Random GAN parameters')
+	elif weights_load is 'gan':
+		logging.debug('Initial load of GAN parameters...')
+		ckpt = tf.train.get_checkpoint_state(args.save_dir_GAN)
+		if ckpt and ckpt.model_checkpoint_path:
+			gan_saver.restore(sess, ckpt.model_checkpoint_path)
+	elif weights_load is 'discriminator':
+		logging.debug('Update GAN parameters from Discriminator...')		
+		ckpt = tf.train.get_checkpoint_state(args.save_dir_dis)
+		if ckpt and ckpt.model_checkpoint_path:
+			dis_saver.restore(sess, ckpt.model_checkpoint_path)
+	else:
+		raise Exception('Invalid weight initialization for GAN')
 
 	for epoch in xrange(args.num_epochs_gen):
 		new_lr = args.learning_rate_gen * (args.decay_rate ** epoch)
@@ -112,7 +115,7 @@ def train_generator(gan, args, sess, train_writer, initial_load = True):
 		state_gen = gan.initial_state_gen.eval()
 		state_dis = gan.initial_state_dis.eval()
 
-		for batch in xrange(200):
+		for batch in xrange(50):
 		# for batch in xrange(batcher.num_batches):
 			start = time.time()
 			x, _  = batcher.next_batch()
@@ -159,7 +162,6 @@ def train_discriminator(discriminator, args, sess):
 		cPickle.dump((batcher.chars, batcher.vocab), f)
 
 	logging.debug('Loading GAN parameters to Discriminator...')
-	# TODO:  Only using the trainable variables, is this OK?
 	dis_vars = [v for v in tf.trainable_variables() if v.name.startswith('classic/')]
 	dis_dict = {}
 	for v in dis_vars:
@@ -179,7 +181,7 @@ def train_discriminator(discriminator, args, sess):
 		batcher.reset_batch_pointer()
 		state = discriminator.initial_state.eval()
 
-		for batch in xrange(10):
+		for batch in xrange(50):
 		# for batch in xrange(batcher.num_batches):
 			start = time.time()
 			x, y  = batcher.next_batch()
@@ -204,7 +206,7 @@ def train_discriminator(discriminator, args, sess):
 				print 'Discriminator model saved to {}'.format(checkpoint_path)
 
 			
-def generate_samples(generator, args, sess, num_samples=1000):
+def generate_samples(generator, args, sess, num_samples=500):
 	'''Generate samples from the current version of the GAN'''
 	samples = []
 
@@ -234,31 +236,31 @@ def reset_reviews(data_dir, file_name):
 	open(os.path.join(data_dir, file_name), 'w').close()
 
 
-def adversarial_training(gan, discriminator, generator, args, sess):
+def adversarial_training(gan, discriminator, generator, train_writer, args, sess):
 	'''Adversarial Training'''
-	train_generator(gan, args, sess, initial_load = True)
-	generate_samples(generator, args, sess)
+	train_generator(gan, args, sess, train_writer, weights_load = 'random')
+	generate_samples(generator, args, sess, 50)
 
 	for epoch in xrange(args.num_epochs_GAN):
 		train_discriminator(discriminator, args, sess)
-		train_generator(gan, args, sess, initial_load = False)
+		train_generator(gan, args, sess, train_writer, weights_load = 'discriminator')
 		reset_reviews(args.data_dir, args.fake_input_file)
-		generate_samples(generator, args, sess, 100)
+		generate_samples(generator, args, sess, 50)
 
 
 if __name__=='__main__':
 	args = parse_args()
-	gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.01)
+	gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.05)
 
 	with tf.device('/gpu:3'):
 		with tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=True, gpu_options=gpu_options)) as sess:
 
 			logging.debug('Creating models...')
 			gan = GAN(args, is_training = True)
-			# with tf.variable_scope('classic'):
-			# 	discriminator = Discriminator(args, is_training = True)
-			# with tf.variable_scope('sampler'):
-			# 	generator = GAN(args, is_training = False)
+			with tf.variable_scope('classic'):
+				discriminator = Discriminator(args, is_training = True)
+			with tf.variable_scope('sampler'):
+				generator = GAN(args, is_training = False)
 
 			logging.debug('TensorBoard...')
 			train_writer = tf.train.SummaryWriter(args.log_dir, sess.graph)
@@ -266,5 +268,5 @@ if __name__=='__main__':
 			logging.debug('Initializing variables in graph...')
 			tf.initialize_all_variables().run()
 
-			# adversarial_training(gan, discriminator, generator, args, sess)
-			train_generator(gan, args, sess, train_writer, initial_load = True)
+			adversarial_training(gan, discriminator, generator, train_writer, args, sess)
+			# train_generator(gan, args, sess, train_writer, weights_load = 'random')

@@ -34,10 +34,10 @@ class GAN(object):
 		if args.model == 'rnn':
 			cell_gen = rnn_cell.BasicRNNCell(args.rnn_size)
 			cell_dis = rnn_cell.BasicRNNCell(args.rnn_size)
-		if args.model == 'gru':
+		elif args.model == 'gru':
 			cell_gen = rnn_cell.GRUCell(args.rnn_size)
 			cell_dis = rnn_cell.GRUCell(args.rnn_size)
-		if args.model == 'lstm':
+		elif args.model == 'lstm':
 			cell_gen = rnn_cell.BasicLSTMCell(args.rnn_size)
 			cell_dis = rnn_cell.BasicLSTMCell(args.rnn_size)
 		else:
@@ -67,13 +67,13 @@ class GAN(object):
 					inputs_gen = [tf.squeeze(i, [1]) for i in inputs_gen]
 
 			outputs_gen, last_state_gen = seq2seq.rnn_decoder(inputs_gen, self.initial_state_gen, 
-				self.cell_gen, loop_function=None, scope='rnn')
+				self.cell_gen, loop_function=None)
 			
-			probs_sequence = []
+			self.probs_sequence = []
 			for output_gen in outputs_gen:
 				logits_gen  = tf.nn.xw_plus_b(output_gen, softmax_w, softmax_b)
 				probs_gen   = tf.nn.softmax(logits_gen)
-				probs_sequence.append(probs_gen)
+				self.probs_sequence.append(probs_gen)
 
 			self.final_state_gen = last_state_gen
 
@@ -90,7 +90,7 @@ class GAN(object):
 
 				inputs_dis = []
 				embedding  = tf.get_variable('embedding', [args.vocab_size, args.rnn_size])
-				for prob in probs_sequence:
+				for prob in self.probs_sequence:
 					inputs_dis.append(tf.matmul(prob, embedding))
 					
 				outputs_dis, last_state_dis = seq2seq.rnn_decoder(inputs_dis, self.initial_state_dis, 
@@ -110,6 +110,9 @@ class GAN(object):
 
 			self.final_state_dis = last_state_dis
 
+		#########
+		# Train
+		#########
 		with tf.name_scope('train'):
 			gen_loss = seq2seq.sequence_loss_by_example(
 				logits,
@@ -124,26 +127,21 @@ class GAN(object):
 
 			if is_training:
 				gen_grads            = tf.gradients(self.gen_cost, gen_vars)
-				self.gen_grads  = gen_grads
-				self.gen_vars   = gen_vars
-				# self.all_grads = [tf.gradients(self.gen_cost, v, name=v.name) for v in self.tvars]
 				self.all_grads       = tf.gradients(self.gen_cost, self.tvars)
 				gen_grads_clipped, _ = tf.clip_by_global_norm(gen_grads, args.grad_clip)
-				# gen_optimizer        = tf.train.AdamOptimizer(self.lr_gen)
-				gen_optimizer        = tf.train.GradientDescentOptimizer(self.lr_gen)
+				gen_optimizer        = tf.train.AdamOptimizer(self.lr_gen)
+				# gen_optimizer        = tf.train.GradientDescentOptimizer(self.lr_gen)
 				self.gen_train_op    = gen_optimizer.apply_gradients(zip(gen_grads_clipped, gen_vars))				
 
 
 		with tf.name_scope('summary'):
 			with tf.name_scope('weight_summary'):
 				for v in self.tvars:
-				# for v in gen_vars:
 					variable_summaries(v, v.op.name)
-
-			with tf.name_scope('grad_summary'):
-				for v in self.all_grads:
-				# for v in gen_grads:
-					variable_summaries(v, v.name)
+			if is_training:
+				with tf.name_scope('grad_summary'):
+					for v in self.all_grads:
+						variable_summaries(v, v.name)
 
 		self.merged = tf.merge_all_summaries()
 
@@ -162,7 +160,7 @@ class GAN(object):
 			for i, char in enumerate(char_arr):
 				x[i,0] = vocab[char]    
 			feed = {self.input_data: x, self.initial_state_gen: state} 
-			[probs, state] = sess.run([self.probs_gen_grouped, self.final_state_gen], feed)
+			[probs, state] = sess.run([self.probs_sequence[0], self.final_state_gen], feed)
 			sample_indexes = [int(np.random.choice(len(p), p=p)) for p in probs]
 			char_arr = [chars[i] for i in sample_indexes]
 			for i, char in enumerate(char_arr):

@@ -18,9 +18,9 @@ class Discriminator(object):
 
         if args.model == 'rnn':
             self.cell = rnn_cell.BasicRNNCell(args.rnn_size)
-        if args.model == 'gru':
+        elif args.model == 'gru':
             self.cell = rnn_cell.GRUCell(args.rnn_size)
-        if args.model == 'lstm':
+        elif args.model == 'lstm':
             self.cell = rnn_cell.BasicLSTMCell(args.rnn_size)
         else:
             raise Exception('model type not supported: {}'.format(args.model))
@@ -40,26 +40,17 @@ class Discriminator(object):
                 inputs    = tf.split(1, args.seq_length, tf.nn.embedding_lookup(embedding, self.input_data))
                 inputs    = [tf.squeeze(i, [1]) for i in inputs]
 
-            self.inputs = inputs
-            state   = self.initial_state
-            outputs = []
+            outputs, last_state = seq2seq.rnn_decoder(inputs, self.initial_state, 
+                self.cell, loop_function=None)
 
-            for i, inp in enumerate(inputs):
-                if i > 0:
-                    tf.get_variable_scope().reuse_variables()                    
-                output, state = self.cell(inp, state)
-                outputs.append(output)
-            last_state = state
-
-        output_tf = tf.reshape(tf.concat(1, outputs), [-1, args.rnn_size])
+        output_tf   = tf.reshape(tf.concat(1, outputs), [-1, args.rnn_size])
         self.logits = tf.nn.xw_plus_b(output_tf, softmax_w, softmax_b)
         self.probs  = tf.nn.softmax(self.logits)
         
         loss = seq2seq.sequence_loss_by_example(
             [self.logits],
             [tf.reshape(self.targets, [-1])],
-            [tf.ones([args.batch_size * args.seq_length])],
-            2)
+            [tf.ones([args.batch_size * args.seq_length])])
 
         self.cost = tf.reduce_sum(loss) / args.batch_size / args.seq_length
 
