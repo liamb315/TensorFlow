@@ -45,7 +45,7 @@ def parse_args():
 		help='number of characters to sample')
 	parser.add_argument('--prime', type=str, default=' ',
 		help='prime text')
-	parser.add_argument('--num_epochs_GAN', type=int, default=5,
+	parser.add_argument('--num_epochs_GAN', type=int, default=25,
 		help='number of epochs of GAN')
 	parser.add_argument('--num_epochs_gen', type=int, default=1,
 		help='number of epochs to train generator')
@@ -238,7 +238,7 @@ def reset_reviews(data_dir, file_name):
 
 def adversarial_training(gan, discriminator, generator, train_writer, args, sess):
 	'''Adversarial Training'''
-	train_generator(gan, args, sess, train_writer, weights_load = 'random')
+	train_generator(gan, args, sess, train_writer, weights_load = 'gan')
 	generate_samples(generator, args, sess, 50)
 
 	for epoch in xrange(args.num_epochs_GAN):
