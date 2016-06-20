@@ -1,8 +1,11 @@
 import tensorflow as tf
 import numpy as np
-from tensorflow.models.rnn import rnn_cell
-from tensorflow.models.rnn import rnn
-from tensorflow.models.rnn import seq2seq
+# from tensorflow.models.rnn import rnn_cell
+# from tensorflow.models.rnn import rnn
+# from tensorflow.models.rnn import seq2seq
+from tensorflow.python.ops.nn import rnn_cell
+from tensorflow.python.ops.nn import rnn
+from tensorflow.python.ops.nn import seq2seq
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import math_ops
