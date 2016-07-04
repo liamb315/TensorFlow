@@ -37,9 +37,9 @@ def parse_args():
 		help='number of layers in the RNN')
 	parser.add_argument('--model', type=str, default='lstm',
 		help='rnn, gru, or lstm')
-	parser.add_argument('--batch_size', type=int, default=10,
+	parser.add_argument('--batch_size', type=int, default=5,
 		help='minibatch size')
-	parser.add_argument('--seq_length', type=int, default=20,
+	parser.add_argument('--seq_length', type=int, default=10,
 		help='RNN sequence length')
 	parser.add_argument('-n', type=int, default=500,
 		help='number of characters to sample')
@@ -55,7 +55,7 @@ def parse_args():
 		help='save frequency')
 	parser.add_argument('--grad_clip', type=float, default=5.,
 		help='clip gradients at this value')
-	parser.add_argument('--learning_rate_gen', type=float, default=0.01,
+	parser.add_argument('--learning_rate_gen', type=float, default=0.1,
 		help='learning rate')
 	parser.add_argument('--learning_rate_dis', type=float, default=0.0002,
 		help='learning rate for discriminator')
@@ -115,7 +115,7 @@ def train_generator(gan, args, sess, train_writer, weights_load = 'random'):
 		state_gen = gan.initial_state_gen.eval()
 		state_dis = gan.initial_state_dis.eval()
 
-		for batch in xrange(50):
+		for batch in xrange(100):
 		# for batch in xrange(batcher.num_batches):
 			start = time.time()
 			x, _  = batcher.next_batch()
@@ -257,10 +257,10 @@ if __name__=='__main__':
 
 			logging.debug('Creating models...')
 			gan = GAN(args, is_training = True)
-			with tf.variable_scope('classic'):
-				discriminator = Discriminator(args, is_training = True)
-			with tf.variable_scope('sampler'):
-				generator = GAN(args, is_training = False)
+			# with tf.variable_scope('classic'):
+			# 	discriminator = Discriminator(args, is_training = True)
+			# with tf.variable_scope('sampler'):
+			# 	generator = GAN(args, is_training = False)
 
 			logging.debug('TensorBoard...')
 			train_writer = tf.train.SummaryWriter(args.log_dir, sess.graph)
@@ -268,5 +268,5 @@ if __name__=='__main__':
 			logging.debug('Initializing variables in graph...')
 			tf.initialize_all_variables().run()
 
-			adversarial_training(gan, discriminator, generator, train_writer, args, sess)
-			# train_generator(gan, args, sess, train_writer, weights_load = 'random')
+			# adversarial_training(gan, discriminator, generator, train_writer, args, sess)
+			train_generator(gan, args, sess, train_writer, weights_load = 'random')

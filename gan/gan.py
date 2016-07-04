@@ -1,8 +1,5 @@
 import tensorflow as tf
 import numpy as np
-# from tensorflow.models.rnn import rnn_cell
-# from tensorflow.models.rnn import rnn
-# from tensorflow.models.rnn import seq2seq
 from tensorflow.python.ops.nn import rnn_cell
 from tensorflow.python.ops.nn import rnn
 from tensorflow.python.ops.nn import seq2seq
@@ -13,7 +10,6 @@ from tensorflow.python.framework import ops
 
 def variable_summaries(var, name):
 	'''Attach a lot of summaries to a Tensor.'''
-	# with tf.name_scope('summaries'):
 	mean = tf.reduce_mean(var)
 	tf.scalar_summary('mean/' + name, mean)
 	with tf.name_scope('stddev'):
@@ -23,9 +19,6 @@ def variable_summaries(var, name):
 	tf.scalar_summary('min/' + name, tf.reduce_min(var))
 	tf.histogram_summary(name, var)
 	
-		
-
-
 class GAN(object):
 	def __init__(self, args, is_training=True):
 
@@ -108,7 +101,7 @@ class GAN(object):
 
 			with tf.name_scope('summary'):
 				probs      = tf.pack(probs)
-				probs_real = tf.slice(probs, [0,0,1], [args.seq_length, 10, 1])
+				probs_real = tf.slice(probs, [0,0,1], [args.seq_length, args.batch_size, 1])
 				variable_summaries(probs_real, 'probability of real')
 
 			self.final_state_dis = last_state_dis
@@ -132,8 +125,8 @@ class GAN(object):
 				gen_grads            = tf.gradients(self.gen_cost, gen_vars)
 				self.all_grads       = tf.gradients(self.gen_cost, self.tvars)
 				gen_grads_clipped, _ = tf.clip_by_global_norm(gen_grads, args.grad_clip)
-				gen_optimizer        = tf.train.AdamOptimizer(self.lr_gen)
-				# gen_optimizer        = tf.train.GradientDescentOptimizer(self.lr_gen)
+				# gen_optimizer        = tf.train.AdamOptimizer(self.lr_gen)
+				gen_optimizer        = tf.train.GradientDescentOptimizer(self.lr_gen)
 				self.gen_train_op    = gen_optimizer.apply_gradients(zip(gen_grads_clipped, gen_vars))				
 
 
@@ -143,8 +136,8 @@ class GAN(object):
 					variable_summaries(v, v.op.name)
 			if is_training:
 				with tf.name_scope('grad_summary'):
-					for v in self.all_grads:
-						variable_summaries(v, v.name)
+					for var, grad in zip(self.tvars, self.all_grads):
+						variable_summaries(grad, 'grad/' + var.op.name)
 
 		self.merged = tf.merge_all_summaries()
 
