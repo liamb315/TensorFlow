@@ -68,8 +68,9 @@ class GAN(object):
 			self.probs_sequence = []
 			for output_gen in outputs_gen:
 				logits_gen  = tf.nn.xw_plus_b(output_gen, softmax_w, softmax_b)
-				probs_gen   = tf.nn.softmax(logits_gen)
-				self.probs_sequence.append(probs_gen)
+				# probs_gen   = tf.nn.softmax(logits_gen)
+				# self.probs_sequence.append(probs_gen)
+				self.probs_sequence.append(logits_gen)
 
 			self.final_state_gen = last_state_gen
 
