@@ -7,6 +7,7 @@ from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.framework import ops
+from tensorflow.contrib.distributions import Categorical
 
 def variable_summaries(var, name):
 	'''Attach a lot of summaries to a Tensor.'''
@@ -65,12 +66,10 @@ class GAN(object):
 			outputs_gen, last_state_gen = seq2seq.rnn_decoder(inputs_gen, self.initial_state_gen, 
 				self.cell_gen, loop_function=None)
 			
-			self.probs_sequence = []
+			self.logits_sequence = []
 			for output_gen in outputs_gen:
 				logits_gen  = tf.nn.xw_plus_b(output_gen, softmax_w, softmax_b)
-				# probs_gen   = tf.nn.softmax(logits_gen)
-				# self.probs_sequence.append(probs_gen)
-				self.probs_sequence.append(logits_gen)
+				self.logits_sequence.append(logits_gen)
 
 			self.final_state_gen = last_state_gen
 
@@ -87,8 +86,9 @@ class GAN(object):
 
 				inputs_dis = []
 				embedding  = tf.get_variable('embedding', [args.vocab_size, args.rnn_size])
-				for prob in self.probs_sequence:
-					inputs_dis.append(tf.matmul(prob, embedding))
+				for logit in self.logits_sequence:
+					inputs_dis.append(tf.matmul(logit, embedding))
+					# inputs_dis.append(tf.matmul(tf.nn.softmax(logit), embedding))
 					
 				outputs_dis, last_state_dis = seq2seq.rnn_decoder(inputs_dis, self.initial_state_dis, 
 					self.cell_dis, loop_function=None)
@@ -126,8 +126,8 @@ class GAN(object):
 				gen_grads            = tf.gradients(self.gen_cost, gen_vars)
 				self.all_grads       = tf.gradients(self.gen_cost, self.tvars)
 				gen_grads_clipped, _ = tf.clip_by_global_norm(gen_grads, args.grad_clip)
-				# gen_optimizer        = tf.train.AdamOptimizer(self.lr_gen)
-				gen_optimizer        = tf.train.GradientDescentOptimizer(self.lr_gen)
+				gen_optimizer        = tf.train.AdamOptimizer(self.lr_gen)
+				# gen_optimizer        = tf.train.GradientDescentOptimizer(self.lr_gen)
 				self.gen_train_op    = gen_optimizer.apply_gradients(zip(gen_grads_clipped, gen_vars))				
 
 
@@ -151,18 +151,17 @@ class GAN(object):
 		for i in xrange(args.batch_size):
 			sequence_matrix.append([])
 		char_arr = args.batch_size * [initial]
-		
 		for n in xrange(seq_length):
 			x = np.zeros((args.batch_size, 1))
 			for i, char in enumerate(char_arr):
 				x[i,0] = vocab[char]    
 			feed = {self.input_data: x, self.initial_state_gen: state} 
-			[probs, state] = sess.run([self.probs_sequence[0], self.final_state_gen], feed)
-			sample_indexes = [int(np.random.choice(len(p), p=p)) for p in probs]
-			char_arr = [chars[i] for i in sample_indexes]
+			sample_op = Categorical(self.logits_sequence[0])
+			[sample_indexes, state] = sess.run([sample_op.sample(n = 1), self.final_state_gen], feed)
+			char_arr = [chars[i] for i in sample_indexes[0]]
 			for i, char in enumerate(char_arr):
 				sequence_matrix[i].append(char)
-		
+
 		with open(datafile, 'a+') as f:
 			for line in sequence_matrix:
 				print ''.join(line)
